@@ -17,6 +17,7 @@ export async function getCurrentSession(): Promise<Session | null> {
 
   return auth.api.getSession({
     headers: await headers(),
+    query: { disableCookieCache: true },
   });
 }
 

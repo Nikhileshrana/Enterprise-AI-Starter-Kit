@@ -10,8 +10,8 @@ import {
 const ALLOWED_ROLES = new Set<string>(ORGANIZATION_ROLES);
 
 /**
- * Direct-add an existing user by email (Better Auth has no email→userId on the client).
- * List / remove / role / leave / delete use authClient.organization.* instead.
+ * Add if the user already exists; otherwise create a Better Auth `invitation`
+ * (pending until they sign in with Google and accept).
  */
 export async function POST(request: NextRequest) {
   const requestHeaders = await headers();
@@ -58,26 +58,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const authCtx = await auth.$context;
-  const found = await authCtx.internalAdapter.findUserByEmail(email);
-  const userId = found?.user?.id;
-
-  if (!userId) {
-    return NextResponse.json(
-      {
-        error:
-          "No account with that email. They must sign in with Google once first.",
-      },
-      { status: 404 },
-    );
-  }
-
   try {
-    const member = await auth.api.addMember({
-      body: { userId, role, organizationId },
+    const authCtx = await auth.$context;
+    const found = await authCtx.internalAdapter.findUserByEmail(email);
+    const userId = found?.user?.id;
+
+    if (userId) {
+      const member = await auth.api.addMember({
+        body: { userId, role, organizationId },
+        headers: requestHeaders,
+      });
+      return NextResponse.json({ status: "added" as const, member });
+    }
+
+    const invitation = await auth.api.createInvitation({
+      body: { email, role, organizationId },
       headers: requestHeaders,
     });
-    return NextResponse.json({ member });
+
+    return NextResponse.json({ status: "invited" as const, invitation });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not add member";

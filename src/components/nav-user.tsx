@@ -52,7 +52,7 @@ export function NavUser({
 
   async function handleLogout() {
     await signOut();
-    router.push("/sign-in");
+    router.replace("/sign-in");
     router.refresh();
   }
 

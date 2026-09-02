@@ -48,6 +48,8 @@ import { authClient, useSession } from "@/lib/auth/client";
 import {
   isOrganizationManager,
   roleHas,
+  toDate,
+  type InvitationRow,
   type MemberRow,
 } from "@/lib/types";
 
@@ -148,7 +150,7 @@ function mapMember(member: {
   id: string;
   role: string;
   userId: string;
-  createdAt?: Date | string;
+  createdAt?: Date | string | null;
   user?: {
     name?: string;
     email?: string;
@@ -162,7 +164,7 @@ function mapMember(member: {
     name: member.user?.name ?? "",
     email: member.user?.email ?? "",
     image: member.user?.image ?? null,
-    createdAt: member.createdAt ? String(member.createdAt) : null,
+    createdAt: toDate(member.createdAt),
   };
 }
 
@@ -179,6 +181,7 @@ export function MembersSettings() {
     { id: "name", desc: false },
   ]);
   const [members, setMembers] = React.useState<MemberRow[]>([]);
+  const [invitations, setInvitations] = React.useState<InvitationRow[]>([]);
   const [organizationId, setOrganizationId] = React.useState<string | null>(
     null,
   );
@@ -211,8 +214,21 @@ export function MembersSettings() {
       return;
     }
 
+    const pending = (fullOrg.data?.invitations ?? [])
+      .filter((invite) => invite.status === "pending")
+      .map(
+        (invite): InvitationRow => ({
+          id: invite.id,
+          email: invite.email,
+          role: invite.role,
+          status: invite.status,
+          expiresAt: toDate(invite.expiresAt),
+        }),
+      );
+
     setCurrentRole(activeMember.data?.role ?? null);
     setMembers((listed.data?.members ?? []).map(mapMember));
+    setInvitations(pending);
     setOrganizationId(fullOrg.data?.id ?? null);
     setOrganizationName(fullOrg.data?.name ?? "Organization");
     setLoading(false);
@@ -250,10 +266,19 @@ export function MembersSettings() {
     const key = (sort?.id ?? "name") as keyof MemberRow;
     const dir = sort?.desc ? -1 : 1;
     return [...rows].sort((a, b) => {
-      const left = String(a[key] ?? "").toLowerCase();
-      const right = String(b[key] ?? "").toLowerCase();
-      if (left < right) return -1 * dir;
-      if (left > right) return 1 * dir;
+      const left = a[key];
+      const right = b[key];
+      if (left instanceof Date || right instanceof Date) {
+        const leftTime = left instanceof Date ? left.getTime() : 0;
+        const rightTime = right instanceof Date ? right.getTime() : 0;
+        if (leftTime < rightTime) return -1 * dir;
+        if (leftTime > rightTime) return 1 * dir;
+        return 0;
+      }
+      const leftText = String(left ?? "").toLowerCase();
+      const rightText = String(right ?? "").toLowerCase();
+      if (leftText < rightText) return -1 * dir;
+      if (leftText > rightText) return 1 * dir;
       return 0;
     });
   }, [members, debouncedSearch, sorting]);
@@ -276,6 +301,7 @@ export function MembersSettings() {
     setBusyId(null);
     const body = (await response.json().catch(() => null)) as {
       error?: string;
+      status?: "added" | "invited";
     } | null;
     if (!response.ok) {
       toast.add({
@@ -285,12 +311,33 @@ export function MembersSettings() {
       return;
     }
     toast.add({
-      title: "Member added",
-      description: `${email.trim()} is now in the organization.`,
+      title: body?.status === "invited" ? "Invitation sent" : "Member added",
+      description:
+        body?.status === "invited"
+          ? `${email.trim()} can join after signing in with Google.`
+          : `${email.trim()} is now in the organization.`,
     });
     setEmail("");
     await loadMembers();
     router.refresh();
+  }
+
+  async function cancelInvitation(invitation: InvitationRow) {
+    if (!canManage) return;
+    setBusyId(invitation.id);
+    const { error } = await authClient.organization.cancelInvitation({
+      invitationId: invitation.id,
+    });
+    setBusyId(null);
+    if (error) {
+      toast.add({
+        title: "Could not cancel invitation",
+        description: error.message,
+      });
+      return;
+    }
+    toast.add({ title: "Invitation canceled" });
+    await loadMembers();
   }
 
   async function removeMember(member: MemberRow) {
@@ -369,8 +416,8 @@ export function MembersSettings() {
           <CardHeader>
             <CardTitle>Add member</CardTitle>
             <CardDescription>
-              Add someone who already signed in with Google. They join
-              immediately — no invite link.
+              Existing accounts join immediately. New emails get a pending
+              invitation until they sign in with Google.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -416,6 +463,44 @@ export function MembersSettings() {
                 </Button>
               </FieldGroup>
             </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canManage && invitations.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending invitations</CardTitle>
+            <CardDescription>
+              Waiting for these people to sign in with Google.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {invitations.map((invitation) => (
+              <div
+                key={invitation.id}
+                className="flex flex-wrap items-center gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{invitation.email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Role: {invitation.role}
+                  </p>
+                </div>
+                <Badge variant="secondary">Pending</Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busyId === invitation.id}
+                  onClick={() => void cancelInvitation(invitation)}
+                >
+                  {busyId === invitation.id ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  Cancel
+                </Button>
+              </div>
+            ))}
           </CardContent>
         </Card>
       ) : null}

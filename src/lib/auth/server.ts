@@ -45,6 +45,9 @@ export const auth = betterAuth({
     organization({
       creatorRole: "owner",
       allowUserToCreateOrganization: true,
+      // Pending invites live in Better Auth's `invitation` collection (no custom table).
+      invitationExpiresIn: 60 * 60 * 24 * 7,
+      cancelPendingInvitationsOnReInvite: true,
     }),
     nextCookies(),
   ],

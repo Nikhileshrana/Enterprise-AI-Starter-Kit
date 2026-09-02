@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { authClient } from "@/lib/auth/client";
+import { authClient, getFreshSession, useSession } from "@/lib/auth/client";
 import type { Organization } from "@/lib/types";
 import {
   AudioLinesIcon,
@@ -42,11 +42,13 @@ export function OrganizationSwitcher({
   const [loading, setLoading] = React.useState(true);
   const [createOpen, setCreateOpen] = React.useState(false);
 
+  const { data: session } = useSession();
+
   const load = React.useCallback(async () => {
     setLoading(true);
-    const [{ data: orgs, error }, session] = await Promise.all([
+    const [{ data: orgs, error }, freshSession] = await Promise.all([
       authClient.organization.list(),
-      authClient.getSession({ query: { disableCookieCache: true } }),
+      getFreshSession(),
     ]);
 
     if (error) {
@@ -61,14 +63,15 @@ export function OrganizationSwitcher({
     const list = (orgs ?? []) as Organization[];
     setOrganizations(list);
     setActiveOrgId(
-      session.data?.session.activeOrganizationId ?? list[0]?.id ?? null,
+      freshSession.data?.session.activeOrganizationId ?? list[0]?.id ?? null,
     );
     setLoading(false);
   }, []);
 
   React.useEffect(() => {
+    if (!session?.user.id) return;
     void load();
-  }, [load]);
+  }, [load, session?.user.id]);
 
   const activeOrg = organizations.find((org) => org.id === activeOrgId) ?? null;
 

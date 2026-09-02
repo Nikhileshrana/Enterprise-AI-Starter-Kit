@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
-import { authClient } from "@/lib/auth/client";
+import { authClient, getFreshSession } from "@/lib/auth/client";
 import type { Organization } from "@/lib/types";
 
 function slugify(value: string) {
@@ -140,8 +140,8 @@ export function OrganizationDialog({
 }
 
 /**
- * First-run gate: force create when the user has zero orgs;
- * otherwise ensure an active org and resume.
+ * First-run gate: accept pending invitations, force create when the user has
+ * zero orgs, otherwise ensure an active org and resume.
  */
 export function OrganizationGate({ userId }: { userId: string }) {
   const router = useRouter();
@@ -152,9 +152,22 @@ export function OrganizationGate({ userId }: { userId: string }) {
     let cancelled = false;
 
     async function bootstrap() {
+      // Join any pending invites for this Google email (Better Auth `invitation`).
+      const userInvites = await authClient.organization.listUserInvitations();
+      if (!cancelled && !userInvites.error) {
+        const pending = (userInvites.data ?? []).filter(
+          (invite) => invite.status === "pending",
+        );
+        for (const invite of pending) {
+          await authClient.organization.acceptInvitation({
+            invitationId: invite.id,
+          });
+        }
+      }
+
       const [{ data: orgs, error }, session] = await Promise.all([
         authClient.organization.list(),
-        authClient.getSession({ query: { disableCookieCache: true } }),
+        getFreshSession(),
       ]);
 
       if (cancelled) return;
