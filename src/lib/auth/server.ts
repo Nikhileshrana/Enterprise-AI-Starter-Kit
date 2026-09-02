@@ -40,11 +40,7 @@ export const auth = betterAuth({
   },
   plugins: [
     bearer(),
-    organization({
-      teams: {
-        enabled: true,
-      },
-    }),
+    organization(),
     nextCookies(), // must be last — sets cookies from server actions / RSC auth calls
   ],
 });

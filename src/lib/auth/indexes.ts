@@ -26,13 +26,5 @@ export async function ensureAuthIndexes(db: Db) {
       .createIndex({ organizationId: 1, userId: 1 }, { unique: true }),
     db.collection("invitation").createIndex({ email: 1 }),
     db.collection("invitation").createIndex({ organizationId: 1 }),
-
-    // Teams (organization plugin with teams.enabled)
-    db.collection("team").createIndex({ organizationId: 1 }),
-    db.collection("teamMember").createIndex({ teamId: 1 }),
-    db.collection("teamMember").createIndex({ userId: 1 }),
-    db
-      .collection("teamMember")
-      .createIndex({ teamId: 1, userId: 1 }, { unique: true }),
   ]);
 }

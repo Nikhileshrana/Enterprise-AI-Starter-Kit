@@ -8,11 +8,7 @@ import { organizationClient } from "better-auth/client/plugins";
  */
 export const authClient = createAuthClient({
   plugins: [
-    organizationClient({
-      teams: {
-        enabled: true,
-      },
-    }),
+    organizationClient(),
   ],
   fetchOptions: {
     credentials: "include",
