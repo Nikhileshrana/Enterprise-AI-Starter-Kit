@@ -12,12 +12,18 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 export function AppSidebar({
   user,
   ...props
 }: ComponentProps<typeof Sidebar> & { user: NavUserData }) {
+  const { isMobile } = useSidebar();
+
+  // Mobile uses top bar + bottom tabs instead of the sheet sidebar.
+  if (isMobile) return null;
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>

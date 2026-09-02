@@ -10,6 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -42,7 +43,11 @@ function slugify(value: string) {
     .slice(0, 48);
 }
 
-export function OrganizationSwitcher() {
+export function OrganizationSwitcher({
+  variant = "sidebar",
+}: {
+  variant?: "sidebar" | "logo";
+}) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const [organizations, setOrganizations] = React.useState<Organization[]>([]);
@@ -65,7 +70,9 @@ export function OrganizationSwitcher() {
     setOrganizations(list);
 
     const session = await authClient.getSession();
-    setActiveOrgId(session.data?.session.activeOrganizationId ?? list[0]?.id ?? null);
+    setActiveOrgId(
+      session.data?.session.activeOrganizationId ?? list[0]?.id ?? null,
+    );
     setLoading(false);
   }, []);
 
@@ -113,6 +120,83 @@ export function OrganizationSwitcher() {
     router.refresh();
   }
 
+  const menuContent = (
+    <DropdownMenuContent
+      className="w-64"
+      align="start"
+      side={variant === "logo" ? "bottom" : isMobile ? "bottom" : "right"}
+      sideOffset={4}
+    >
+      <DropdownMenuGroup>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Organizations
+        </DropdownMenuLabel>
+        {organizations.map((org) => (
+          <DropdownMenuItem
+            key={org.id}
+            onClick={() => void switchOrganization(org.id)}
+            className="gap-2 p-2"
+          >
+            <div className="flex size-6 items-center justify-center rounded-md border">
+              <AudioLinesIcon />
+            </div>
+            <span className="flex-1 truncate">{org.name}</span>
+            {org.id === activeOrgId ? <CheckIcon /> : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem
+          className="gap-2 p-2"
+          onClick={() => void createOrganization()}
+        >
+          <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+            <PlusIcon />
+          </div>
+          <span className="font-medium text-muted-foreground">
+            Create organization
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  );
+
+  if (variant === "logo") {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              className="h-10 gap-2 px-1.5"
+              aria-label="Switch organization"
+            />
+          }
+        >
+          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <GalleryVerticalEndIcon />
+          </div>
+          <div className="grid min-w-0 flex-1 text-start text-sm leading-tight">
+            {loading ? (
+              <>
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="mt-1 h-3 w-16" />
+              </>
+            ) : (
+              <>
+                <span className="truncate font-medium">
+                  {activeOrg?.name ?? "Select organization"}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {activeOrg?.slug ?? "Organization"}
+                </span>
+              </>
+            )}
+          </div>
+        </DropdownMenuTrigger>
+        {menuContent}
+      </DropdownMenu>
+    );
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -147,42 +231,7 @@ export function OrganizationSwitcher() {
             </div>
             <ChevronsUpDownIcon className="ms-auto" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-64"
-            align="start"
-            side={isMobile ? "bottom" : "right"}
-            sideOffset={4}
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Organizations
-              </DropdownMenuLabel>
-              {organizations.map((org) => (
-                <DropdownMenuItem
-                  key={org.id}
-                  onClick={() => void switchOrganization(org.id)}
-                  className="gap-2 p-2"
-                >
-                  <div className="flex size-6 items-center justify-center rounded-md border">
-                    <AudioLinesIcon />
-                  </div>
-                  <span className="flex-1 truncate">{org.name}</span>
-                  {org.id === activeOrgId ? <CheckIcon /> : null}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuItem
-                className="gap-2 p-2"
-                onClick={() => void createOrganization()}
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                  <PlusIcon />
-                </div>
-                <span className="font-medium text-muted-foreground">
-                  Create organization
-                </span>
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
+          {menuContent}
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>

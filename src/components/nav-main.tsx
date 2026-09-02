@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PLATFORM_NAV_ITEMS } from "@/components/nav-items";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -9,25 +10,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { LayoutDashboardIcon, Settings2Icon, SparklesIcon } from "lucide-react";
-
-const items = [
-  {
-    title: "Dashboard",
-    url: "/protected/dashboard",
-    icon: <LayoutDashboardIcon />,
-  },
-  {
-    title: "AI",
-    url: "/protected/ai",
-    icon: <SparklesIcon />,
-  },
-  {
-    title: "Settings",
-    url: "/protected/settings",
-    icon: <Settings2Icon />,
-  },
-] as const;
 
 export function NavMain() {
   const pathname = usePathname();
@@ -36,18 +18,23 @@ export function NavMain() {
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton
-              isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-              tooltip={item.title}
-              render={<Link href={item.url} />}
-            >
-              {item.icon}
-              <span>{item.title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
+        {PLATFORM_NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton
+                isActive={
+                  pathname === item.url || pathname.startsWith(`${item.url}/`)
+                }
+                tooltip={item.title}
+                render={<Link href={item.url} />}
+              >
+                <Icon />
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
       </SidebarMenu>
     </SidebarGroup>
   );

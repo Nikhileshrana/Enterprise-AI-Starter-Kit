@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileBottomNav, MobileTopBar } from "@/components/mobile-nav";
 import { OrganizationDialog } from "@/components/organization-dialog";
 import {
   SidebarInset,
@@ -15,13 +16,17 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={<ProtectedShellFallback />}>
-      <ProtectedShell>{children}</ProtectedShell>
+    <Suspense fallback={<ProtectedLayoutFallback />}>
+      <ProtectedLayoutContent>{children}</ProtectedLayoutContent>
     </Suspense>
   );
 }
 
-async function ProtectedShell({ children }: { children: React.ReactNode }) {
+async function ProtectedLayoutContent({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const session = await getCurrentSession();
 
   if (!session) {
@@ -29,7 +34,6 @@ async function ProtectedShell({ children }: { children: React.ReactNode }) {
   }
 
   const user = {
-    id: session.user.id,
     name: session.user.name,
     email: session.user.email,
     image: session.user.image ?? null,
@@ -39,16 +43,18 @@ async function ProtectedShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
+        <MobileTopBar user={user} />
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 pb-[calc(3.5rem+max(0.5rem,env(safe-area-inset-bottom))+1rem)] md:pb-4">
           {children}
         </div>
+        <MobileBottomNav />
       </SidebarInset>
-      <OrganizationDialog userId={user.id} />
+      <OrganizationDialog userId={session.user.id} />
     </SidebarProvider>
   );
 }
 
-function ProtectedShellFallback() {
+function ProtectedLayoutFallback() {
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
       <Skeleton className="h-10 w-48" />

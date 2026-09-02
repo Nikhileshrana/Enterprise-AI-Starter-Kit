@@ -6,6 +6,7 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +40,13 @@ function initials(name: string) {
     .join("");
 }
 
-export function NavUser({ user }: { user: NavUserData }) {
+export function NavUser({
+  user,
+  variant = "sidebar",
+}: {
+  user: NavUserData;
+  variant?: "sidebar" | "header";
+}) {
   const { isMobile } = useSidebar();
   const router = useRouter();
 
@@ -49,55 +56,74 @@ export function NavUser({ user }: { user: NavUserData }) {
     router.refresh();
   }
 
-  return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />
-            }
-          >
-            <Avatar>
-              <AvatarImage src={user.image ?? undefined} alt={user.name} />
-              <AvatarFallback>{initials(user.name) || "U"}</AvatarFallback>
-            </Avatar>
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          variant === "header" ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              aria-label="Account menu"
+            />
+          ) : (
+            <SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />
+          )
+        }
+      >
+        <Avatar>
+          <AvatarImage src={user.image ?? undefined} alt={user.name} />
+          <AvatarFallback>{initials(user.name) || "U"}</AvatarFallback>
+        </Avatar>
+        {variant === "sidebar" ? (
+          <>
             <div className="grid flex-1 text-start text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs">{user.email}</span>
             </div>
             <ChevronsUpDownIcon className="ms-auto size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-fit min-w-56"
-            side={isMobile ? "bottom" : "right"}
-            align="end"
-            sideOffset={4}
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="p-0 font-normal">
-                <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                  <Avatar>
-                    <AvatarImage src={user.image ?? undefined} alt={user.name} />
-                    <AvatarFallback>{initials(user.name) || "U"}</AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-start text-sm leading-tight">
-                    <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs">{user.email}</span>
-                  </div>
-                </div>
-              </DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOutIcon />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="w-fit min-w-56"
+        side={variant === "header" ? "bottom" : isMobile ? "bottom" : "right"}
+        align="end"
+        sideOffset={4}
+      >
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
+              <Avatar>
+                <AvatarImage src={user.image ?? undefined} alt={user.name} />
+                <AvatarFallback>{initials(user.name) || "U"}</AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-start text-sm leading-tight">
+                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate text-xs">{user.email}</span>
+              </div>
+            </div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOutIcon />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  if (variant === "header") {
+    return menu;
+  }
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>{menu}</SidebarMenuItem>
     </SidebarMenu>
   );
 }
