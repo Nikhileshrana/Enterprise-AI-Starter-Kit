@@ -60,7 +60,7 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function sendAutomaticallyWhen({
   messages,
@@ -120,17 +120,10 @@ export function AiChat() {
   }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">AI</h1>
-        <p className="text-sm text-muted-foreground">
-          Tool-loop agent with reasoning, tools, generative UI, and human-in-the-loop.
-        </p>
-      </div>
-
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-1 flex-col gap-3 overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <MessageScrollerProvider autoScroll>
-          <MessageScroller className="min-h-0 flex-1 overflow-hidden rounded-xl border">
+          <MessageScroller className="min-h-0 flex-1 overflow-hidden">
             <MessageScrollerViewport>
               <MessageScrollerContent className="p-4">
                 {messages.length === 0 ? (
@@ -618,9 +611,10 @@ function QuestionnaireToolPart({
 
 function ToolPending({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Spinner />
-      <span className="shimmer">{label}</span>
+    <div className="flex w-full max-w-xs flex-col gap-2">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-16 w-full" />
+      <span className="sr-only">{label}</span>
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient, useSession } from "@/lib/auth/client";
@@ -340,16 +341,9 @@ export function MembersSettings() {
           </Field>
 
           {loading && !payload ? (
-            <div className="flex justify-center py-8">
-              <Spinner />
-            </div>
+            <MembersTableSkeleton />
           ) : (
-            <div className="relative">
-              {loading ? (
-                <div className="absolute inset-0 z-10 flex items-start justify-center bg-background/50 pt-10">
-                  <Spinner />
-                </div>
-              ) : null}
+            <div className={loading ? "opacity-60" : undefined}>
               <DataTable
                 columns={memberColumns}
                 data={payload?.data ?? []}
@@ -374,6 +368,39 @@ export function MembersSettings() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function MembersTableSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <div className="overflow-hidden rounded-md border">
+        <div className="flex gap-4 border-b px-4 py-3">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="ms-auto h-4 w-20" />
+        </div>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
+          >
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="ms-auto h-7 w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <Skeleton className="h-3 w-36" />
+        <div className="flex gap-2">
+          <Skeleton className="h-7 w-20" />
+          <Skeleton className="h-7 w-16" />
+        </div>
+      </div>
     </div>
   );
 }

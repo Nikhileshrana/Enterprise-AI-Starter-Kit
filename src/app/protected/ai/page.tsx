@@ -13,7 +13,18 @@ import { KeyRoundIcon } from "lucide-react";
 
 export default function AiPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+    <Suspense
+      fallback={
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+          <Skeleton className="min-h-0 flex-1 rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-md" />
+        </div>
+      }
+    >
       <AiPageContent />
     </Suspense>
   );

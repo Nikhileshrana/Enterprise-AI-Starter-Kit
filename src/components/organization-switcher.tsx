@@ -17,6 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { toast } from "@/components/ui/toast";
+import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth/client";
 import {
   AudioLinesIcon,
@@ -128,12 +129,21 @@ export function OrganizationSwitcher() {
               <GalleryVerticalEndIcon />
             </div>
             <div className="grid flex-1 text-start text-sm leading-tight">
-              <span className="truncate font-medium">
-                {loading ? "Loading…" : (activeOrg?.name ?? "Select organization")}
-              </span>
-              <span className="truncate text-xs text-muted-foreground">
-                {activeOrg?.slug ?? "Organization"}
-              </span>
+              {loading ? (
+                <>
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="mt-1 h-3 w-20" />
+                </>
+              ) : (
+                <>
+                  <span className="truncate font-medium">
+                    {activeOrg?.name ?? "Select organization"}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {activeOrg?.slug ?? "Organization"}
+                  </span>
+                </>
+              )}
             </div>
             <ChevronsUpDownIcon className="ms-auto" />
           </DropdownMenuTrigger>

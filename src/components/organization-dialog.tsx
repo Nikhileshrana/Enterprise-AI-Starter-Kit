@@ -17,6 +17,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient } from "@/lib/auth/client";
@@ -119,8 +120,12 @@ export function OrganizationDialog({ userId }: { userId: string }) {
         </DialogHeader>
 
         {loading ? (
-          <div className="flex justify-center py-6">
-            <Spinner />
+          <div className="flex flex-col gap-3 py-2">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-3/4" />
+            <Skeleton className="mt-2 h-7 w-full" />
+            <Skeleton className="h-9 w-full" />
           </div>
         ) : (
           <div className="flex flex-col gap-4">
