@@ -38,9 +38,11 @@ type UploadBlobOptions = Omit<
 };
 
 /**
- * Public client upload (browser → Blob). Supports large files (e.g. 300 MB).
+ * Private client upload (browser → Vercel Blob directly).
+ * Supports large files (e.g. 300 MB). Your server only issues a token.
  *
  * @see https://vercel.com/docs/vercel-blob/client-upload
+ * @see https://vercel.com/docs/vercel-blob/private-storage
  */
 export async function uploadBlob(
   file: File,
@@ -53,7 +55,7 @@ export async function uploadBlob(
 
   return upload(pathname, file, {
     ...rest,
-    access: "public",
+    access: "private",
     handleUploadUrl: handleUploadUrl ?? "/api/blob/client-upload",
     multipart: rest.multipart ?? true,
   });

@@ -4,10 +4,12 @@ import { auth } from "@/lib/auth";
 import { assertBlobPath } from "@/lib/blob";
 
 /**
- * Client upload token exchange (browser → Vercel Blob).
- * Use for large files (e.g. 300 MB). Requires BLOB_READ_WRITE_TOKEN.
+ * Client upload token exchange only — the file itself never hits this route.
+ * Browser uploads directly to private Vercel Blob (supports e.g. 300 MB).
+ * Requires BLOB_READ_WRITE_TOKEN.
  *
  * @see https://vercel.com/docs/vercel-blob/client-upload
+ * @see https://vercel.com/docs/vercel-blob/private-storage
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
