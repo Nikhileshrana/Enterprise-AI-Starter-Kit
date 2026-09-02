@@ -6,13 +6,34 @@ import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithApprovalResponses,
   lastAssistantMessageIsCompleteWithToolCalls,
+  isFileUIPart,
   isReasoningUIPart,
   isTextUIPart,
+  type FileUIPart,
 } from "ai";
-import { ArrowUpIcon, BrainIcon, SparklesIcon, SquareIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  BrainIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  PaperclipIcon,
+  SparklesIcon,
+  SquareIcon,
+  XIcon,
+} from "lucide-react";
 import type { StarterKitUIMessage } from "@/lib/ai/agent";
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +82,57 @@ import {
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
+
+const ACCEPTED_FILES =
+  "image/*,application/pdf,text/csv,.csv,image/png,image/jpeg,image/webp,image/gif";
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function isAllowedFile(file: File) {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  return (
+    type.startsWith("image/") ||
+    type === "application/pdf" ||
+    type === "text/csv" ||
+    name.endsWith(".csv") ||
+    name.endsWith(".pdf")
+  );
+}
+
+function mediaTypeForFile(file: File) {
+  if (file.type) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".csv")) return "text/csv";
+  if (name.endsWith(".pdf")) return "application/pdf";
+  return "application/octet-stream";
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function toFileUIParts(files: File[]): Promise<FileUIPart[]> {
+  return Promise.all(
+    files.map(async (file) => ({
+      type: "file" as const,
+      filename: file.name,
+      mediaType: mediaTypeForFile(file),
+      url: await readFileAsDataUrl(file),
+    })),
+  );
+}
 
 function sendAutomaticallyWhen({
   messages,
@@ -75,7 +147,9 @@ function sendAutomaticallyWhen({
 
 export function AiChat() {
   const [input, setInput] = React.useState("");
+  const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { messages, sendMessage, status, stop, error, addToolOutput, addToolApprovalResponse } =
     useChat<StarterKitUIMessage>({
       transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -100,12 +174,49 @@ export function AiChat() {
     });
   }
 
-  function onSubmit(event: React.FormEvent) {
+  function addFiles(list: FileList | File[]) {
+    const next = Array.from(list);
+    const accepted: File[] = [];
+    for (const file of next) {
+      if (!isAllowedFile(file)) {
+        toast.add({
+          title: "Unsupported file",
+          description: `${file.name} — use images, PDF, or CSV.`,
+        });
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        toast.add({
+          title: "File too large",
+          description: `${file.name} exceeds 10 MB.`,
+        });
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...accepted]);
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     const text = input.trim();
-    if (!text || busy) return;
-    sendMessage({ text });
+    if ((!text && pendingFiles.length === 0) || busy) return;
+
+    const files =
+      pendingFiles.length > 0 ? await toFileUIParts(pendingFiles) : undefined;
+
+    sendMessage({
+      text: text || (files?.length ? "Please review the attached file(s)." : ""),
+      files,
+    });
     setInput("");
+    setPendingFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     focusComposer();
   }
 
@@ -134,8 +245,8 @@ export function AiChat() {
                       </EmptyMedia>
                       <EmptyTitle>Start a conversation</EmptyTitle>
                       <EmptyDescription>
-                        Try weather, a stock symbol, timezone, a confirmation, or drafting an org
-                        announcement (approval required).
+                        Attach images, PDFs, or CSVs, or try weather, stocks, timezone,
+                        confirmation, or an org announcement.
                       </EmptyDescription>
                     </EmptyHeader>
                   </Empty>
@@ -168,13 +279,7 @@ export function AiChat() {
                   </MessageScrollerItem>
                 ))}
 
-                {status === "submitted" ? (
-                  <Marker>
-                    <MarkerContent>
-                      <span className="shimmer">Thinking…</span>
-                    </MarkerContent>
-                  </Marker>
-                ) : null}
+                {status === "submitted" ? <AssistantPendingSkeleton /> : null}
 
                 {error ? (
                   <Marker>
@@ -190,18 +295,62 @@ export function AiChat() {
         </MessageScrollerProvider>
       </div>
 
-      <form onSubmit={onSubmit} className="shrink-0 pb-1">
+      <form onSubmit={(event) => void onSubmit(event)} className="shrink-0 space-y-2 pb-1">
+        {pendingFiles.length > 0 ? (
+          <AttachmentGroup>
+            {pendingFiles.map((file, index) => (
+              <PendingFileAttachment
+                key={`${file.name}-${file.size}-${index}`}
+                file={file}
+                onRemove={() => removePendingFile(index)}
+              />
+            ))}
+          </AttachmentGroup>
+        ) : null}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="sr-only"
+          accept={ACCEPTED_FILES}
+          multiple
+          onChange={(event) => {
+            if (event.target.files?.length) {
+              addFiles(event.target.files);
+            }
+          }}
+        />
+
         <InputGroup className="h-auto items-end">
+          <InputGroupAddon align="block-start" className="pt-2">
+            <InputGroupButton
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Attach files"
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <PaperclipIcon />
+            </InputGroupButton>
+          </InputGroupAddon>
           <InputGroupTextarea
             ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Message the agent…"
+            placeholder="Message the agent… (images, PDF, CSV)"
             rows={2}
+            onPaste={(event) => {
+              const items = event.clipboardData?.files;
+              if (items?.length) {
+                event.preventDefault();
+                addFiles(items);
+              }
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                onSubmit(event);
+                void onSubmit(event);
               }
             }}
           />
@@ -225,7 +374,7 @@ export function AiChat() {
                 size="icon-sm"
                 variant="default"
                 aria-label="Send"
-                disabled={!input.trim()}
+                disabled={!input.trim() && pendingFiles.length === 0}
               >
                 <ArrowUpIcon />
               </InputGroupButton>
@@ -234,6 +383,104 @@ export function AiChat() {
         </InputGroup>
       </form>
     </div>
+  );
+}
+
+function AssistantPendingSkeleton() {
+  return (
+    <div className="flex w-full max-w-[80%] flex-col gap-2">
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
+}
+
+function FilePartAttachment({
+  part,
+}: {
+  part: Extract<StarterKitUIMessage["parts"][number], { type: "file" }>;
+}) {
+  const mediaType = part.mediaType ?? "application/octet-stream";
+  const isImage = mediaType.startsWith("image/");
+  const isPdf =
+    mediaType === "application/pdf" ||
+    (part.filename?.toLowerCase().endsWith(".pdf") ?? false);
+  const isCsv =
+    mediaType === "text/csv" ||
+    (part.filename?.toLowerCase().endsWith(".csv") ?? false);
+
+  return (
+    <Attachment state="done" size="sm">
+      <AttachmentMedia variant={isImage ? "image" : "icon"}>
+        {isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={part.url} alt={part.filename ?? "attachment"} />
+        ) : isPdf ? (
+          <FileTextIcon />
+        ) : isCsv ? (
+          <FileSpreadsheetIcon />
+        ) : (
+          <FileTextIcon />
+        )}
+      </AttachmentMedia>
+      <AttachmentContent>
+        <AttachmentTitle>{part.filename ?? "Attachment"}</AttachmentTitle>
+        <AttachmentDescription>{mediaType}</AttachmentDescription>
+      </AttachmentContent>
+    </Attachment>
+  );
+}
+
+function PendingFileAttachment({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) {
+  const mediaType = mediaTypeForFile(file);
+  const isImage = mediaType.startsWith("image/");
+  const previewUrl = React.useMemo(
+    () => (isImage ? URL.createObjectURL(file) : null),
+    [file, isImage],
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  return (
+    <Attachment state="done" size="sm">
+      <AttachmentMedia variant={isImage ? "image" : "icon"}>
+        {isImage && previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewUrl} alt={file.name} />
+        ) : mediaType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? (
+          <FileTextIcon />
+        ) : (
+          <FileSpreadsheetIcon />
+        )}
+      </AttachmentMedia>
+      <AttachmentContent>
+        <AttachmentTitle>{file.name}</AttachmentTitle>
+        <AttachmentDescription>
+          {mediaType} · {formatBytes(file.size)}
+        </AttachmentDescription>
+      </AttachmentContent>
+      <AttachmentActions>
+        <AttachmentAction
+          type="button"
+          aria-label={`Remove ${file.name}`}
+          onClick={onRemove}
+        >
+          <XIcon />
+        </AttachmentAction>
+      </AttachmentActions>
+    </Attachment>
   );
 }
 
@@ -264,6 +511,10 @@ function MessagePartView({
         <BubbleContent className="whitespace-pre-wrap">{part.text}</BubbleContent>
       </Bubble>
     );
+  }
+
+  if (isFileUIPart(part)) {
+    return <FilePartAttachment part={part} />;
   }
 
   if (isReasoningUIPart(part)) {
