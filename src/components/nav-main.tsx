@@ -9,13 +9,18 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { LayoutDashboardIcon, Settings2Icon } from "lucide-react";
+import { LayoutDashboardIcon, Settings2Icon, SparklesIcon } from "lucide-react";
 
 const items = [
   {
     title: "Dashboard",
     url: "/protected/dashboard",
     icon: <LayoutDashboardIcon />,
+  },
+  {
+    title: "AI",
+    url: "/protected/ai",
+    icon: <SparklesIcon />,
   },
   {
     title: "Settings",
