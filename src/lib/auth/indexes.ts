@@ -24,6 +24,7 @@ export async function ensureAuthIndexes(db: Db) {
     db
       .collection("member")
       .createIndex({ organizationId: 1, userId: 1 }, { unique: true }),
+    // Organization plugin schema includes invitation even if unused
     db.collection("invitation").createIndex({ email: 1 }),
     db.collection("invitation").createIndex({ organizationId: 1 }),
   ]);

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileBottomNav, MobileTopBar } from "@/components/mobile-nav";
-import { OrganizationDialog } from "@/components/organization-dialog";
+import { OrganizationGate } from "@/components/organization-dialog";
 import {
   SidebarInset,
   SidebarProvider,
@@ -49,7 +49,7 @@ async function ProtectedLayoutContent({
         </div>
         <MobileBottomNav />
       </SidebarInset>
-      <OrganizationDialog userId={session.user.id} />
+      <OrganizationGate userId={session.user.id} />
     </SidebarProvider>
   );
 }

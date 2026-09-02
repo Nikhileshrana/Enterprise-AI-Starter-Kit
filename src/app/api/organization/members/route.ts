@@ -1,23 +1,23 @@
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
-import { db } from "@/lib/db/mongodb";
+import {
+  ORGANIZATION_ROLES,
+  isOrganizationManager,
+  type OrganizationRole,
+} from "@/lib/types";
 
-export type MemberRow = {
-  id: string;
-  role: string;
-  userId: string;
-  name: string;
-  email: string;
-  image: string | null;
-  createdAt: string | null;
-};
+const ALLOWED_ROLES = new Set<string>(ORGANIZATION_ROLES);
 
-const SORT_FIELDS = new Set(["name", "email", "role", "createdAt"]);
-
-export async function GET(request: NextRequest) {
+/**
+ * Direct-add an existing user by email (Better Auth has no email→userId on the client).
+ * List / remove / role / leave / delete use authClient.organization.* instead.
+ */
+export async function POST(request: NextRequest) {
+  const requestHeaders = await headers();
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: requestHeaders,
+    query: { disableCookieCache: true },
   });
 
   if (!session) {
@@ -32,110 +32,55 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { searchParams } = request.nextUrl;
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
-  const pageSize = Math.min(
-    50,
-    Math.max(1, Number(searchParams.get("pageSize") ?? "10") || 10),
-  );
-  const search = (searchParams.get("search") ?? "").trim();
-  const sortByRaw = searchParams.get("sortBy") ?? "name";
-  const sortBy = SORT_FIELDS.has(sortByRaw) ? sortByRaw : "name";
-  const sortDir = searchParams.get("sortDir") === "desc" ? -1 : 1;
-
-  const matchStage: Record<string, unknown> = { organizationId };
-  if (search) {
-    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = { $regex: escaped, $options: "i" };
-    matchStage.$or = [
-      { "user.name": regex },
-      { "user.email": regex },
-      { role: regex },
-    ];
+  let activeMember;
+  try {
+    activeMember = await auth.api.getActiveMember({ headers: requestHeaders });
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const sortKey =
-    sortBy === "name"
-      ? "user.name"
-      : sortBy === "email"
-        ? "user.email"
-        : sortBy;
+  if (!isOrganizationManager(activeMember?.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const pipeline = [
-    { $match: { organizationId } },
-    {
-      $lookup: {
-        from: "user",
-        localField: "userId",
-        foreignField: "id",
-        as: "userDocs",
+  const body = (await request.json().catch(() => null)) as {
+    email?: string;
+    role?: string;
+  } | null;
+
+  const email = body?.email?.trim().toLowerCase();
+  const role = (body?.role?.trim() || "member") as OrganizationRole;
+
+  if (!email) {
+    return NextResponse.json({ error: "Email is required" }, { status: 400 });
+  }
+  if (!ALLOWED_ROLES.has(role)) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+
+  const authCtx = await auth.$context;
+  const found = await authCtx.internalAdapter.findUserByEmail(email);
+  const userId = found?.user?.id;
+
+  if (!userId) {
+    return NextResponse.json(
+      {
+        error:
+          "No account with that email. They must sign in with Google once first.",
       },
-    },
-    {
-      $addFields: {
-        user: { $arrayElemAt: ["$userDocs", 0] },
-      },
-    },
-    ...(search ? [{ $match: matchStage }] : []),
-    {
-      $facet: {
-        meta: [{ $count: "total" }],
-        rows: [
-          { $sort: { [sortKey]: sortDir } },
-          { $skip: (page - 1) * pageSize },
-          { $limit: pageSize },
-          {
-            $project: {
-              _id: 0,
-              id: "$id",
-              role: 1,
-              userId: 1,
-              name: { $ifNull: ["$user.name", ""] },
-              email: { $ifNull: ["$user.email", ""] },
-              image: { $ifNull: ["$user.image", null] },
-              createdAt: {
-                $cond: [
-                  { $ifNull: ["$createdAt", false] },
-                  { $toString: "$createdAt" },
-                  null,
-                ],
-              },
-            },
-          },
-        ],
-      },
-    },
-  ];
+      { status: 404 },
+    );
+  }
 
-  const [result] = await db
-    .collection("member")
-    .aggregate<{
-      meta: { total: number }[];
-      rows: MemberRow[];
-    }>(pipeline)
-    .toArray();
-
-  const total = result?.meta[0]?.total ?? 0;
-  const data = result?.rows ?? [];
-
-  const org = await db
-    .collection("organization")
-    .findOne({ id: organizationId });
-
-  const membership = await db.collection("member").findOne({
-    organizationId,
-    userId: session.user.id,
-  });
-
-  return NextResponse.json({
-    data,
-    total,
-    page,
-    pageSize,
-    pageCount: Math.max(1, Math.ceil(total / pageSize)),
-    organizationName: (org?.name as string | undefined) ?? "Organization",
-    canManage: ["owner", "admin"].includes(
-      (membership?.role as string | undefined) ?? "",
-    ),
-  });
+  try {
+    const member = await auth.api.addMember({
+      body: { userId, role, organizationId },
+      headers: requestHeaders,
+    });
+    return NextResponse.json({ member });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not add member";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

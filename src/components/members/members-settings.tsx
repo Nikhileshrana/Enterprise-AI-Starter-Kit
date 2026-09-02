@@ -3,7 +3,16 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { PaginationState, SortingState } from "@tanstack/react-table";
-import type { MemberRow } from "@/app/api/organization/members/route";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,16 +45,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient, useSession } from "@/lib/auth/client";
-
-type MembersResponse = {
-  data: MemberRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  pageCount: number;
-  organizationName: string;
-  canManage: boolean;
-};
+import {
+  isOrganizationManager,
+  roleHas,
+  type MemberRow,
+} from "@/lib/types";
 
 type MemberTableMeta = {
   currentUserId?: string;
@@ -64,9 +68,7 @@ const memberColumns = columnHelper.columns([
     ),
     cell: ({ row, table }) => {
       const meta = table.options.meta as MemberTableMeta | undefined;
-      const isSelf =
-        row.original.userId === meta?.currentUserId ||
-        row.original.id === meta?.currentUserId;
+      const isSelf = row.original.userId === meta?.currentUserId;
       return (
         <span className="font-medium">
           {row.original.name || "—"}
@@ -100,9 +102,7 @@ const memberColumns = columnHelper.columns([
       if (!meta?.canManage) return null;
 
       const member = row.original;
-      const isSelf =
-        member.userId === meta.currentUserId ||
-        member.id === meta.currentUserId;
+      const isSelf = member.userId === meta.currentUserId;
       const busy = meta.busyId === member.id;
 
       return (
@@ -144,6 +144,28 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
+function mapMember(member: {
+  id: string;
+  role: string;
+  userId: string;
+  createdAt?: Date | string;
+  user?: {
+    name?: string;
+    email?: string;
+    image?: string | null;
+  };
+}): MemberRow {
+  return {
+    id: member.id,
+    role: member.role,
+    userId: member.userId,
+    name: member.user?.name ?? "",
+    email: member.user?.email ?? "",
+    image: member.user?.image ?? null,
+    createdAt: member.createdAt ? String(member.createdAt) : null,
+  };
+}
+
 export function MembersSettings() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -156,43 +178,45 @@ export function MembersSettings() {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "name", desc: false },
   ]);
-  const [payload, setPayload] = React.useState<MembersResponse | null>(null);
+  const [members, setMembers] = React.useState<MemberRow[]>([]);
+  const [organizationId, setOrganizationId] = React.useState<string | null>(
+    null,
+  );
+  const [organizationName, setOrganizationName] = React.useState("Organization");
+  const [currentRole, setCurrentRole] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [email, setEmail] = React.useState("");
-  const [inviteRole, setInviteRole] = React.useState("member");
+  const [addRole, setAddRole] = React.useState("member");
   const [busyId, setBusyId] = React.useState<string | null>(null);
-
-  const sort = sorting[0];
-  const sortBy = sort?.id ?? "name";
-  const sortDir = sort?.desc ? "desc" : "asc";
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   const loadMembers = React.useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({
-      page: String(pagination.pageIndex + 1),
-      pageSize: String(pagination.pageSize),
-      search: debouncedSearch,
-      sortBy,
-      sortDir,
-    });
-    const response = await fetch(`/api/organization/members?${params}`, {
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
+    const [activeMember, listed, fullOrg] = await Promise.all([
+      authClient.organization.getActiveMember(),
+      authClient.organization.listMembers({ query: { limit: 100, offset: 0 } }),
+      authClient.organization.getFullOrganization(),
+    ]);
+
+    if (activeMember.error || listed.error || fullOrg.error) {
       toast.add({
         title: "Could not load members",
-        description: body?.error ?? response.statusText,
+        description:
+          activeMember.error?.message ??
+          listed.error?.message ??
+          fullOrg.error?.message ??
+          "Unknown error",
       });
       setLoading(false);
       return;
     }
-    const json = (await response.json()) as MembersResponse;
-    setPayload(json);
+
+    setCurrentRole(activeMember.data?.role ?? null);
+    setMembers((listed.data?.members ?? []).map(mapMember));
+    setOrganizationId(fullOrg.data?.id ?? null);
+    setOrganizationName(fullOrg.data?.name ?? "Organization");
     setLoading(false);
-  }, [debouncedSearch, pagination.pageIndex, pagination.pageSize, sortBy, sortDir]);
+  }, []);
 
   React.useEffect(() => {
     void loadMembers();
@@ -202,24 +226,68 @@ export function MembersSettings() {
     setPagination((prev) =>
       prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 },
     );
-  }, [debouncedSearch, sortBy, sortDir]);
+  }, [debouncedSearch, sorting]);
 
-  const canManage = payload?.canManage ?? false;
+  const canManage = isOrganizationManager(currentRole);
+  const ownerCount = members.filter((member) =>
+    roleHas(member.role, "owner"),
+  ).length;
+  const isSoleOwner = roleHas(currentRole, "owner") && ownerCount <= 1;
 
-  async function inviteMember(event: React.FormEvent) {
+  const filtered = React.useMemo(() => {
+    const search = debouncedSearch.trim().toLowerCase();
+    let rows = members;
+    if (search) {
+      rows = rows.filter(
+        (row) =>
+          row.name.toLowerCase().includes(search) ||
+          row.email.toLowerCase().includes(search) ||
+          row.role.toLowerCase().includes(search),
+      );
+    }
+
+    const sort = sorting[0];
+    const key = (sort?.id ?? "name") as keyof MemberRow;
+    const dir = sort?.desc ? -1 : 1;
+    return [...rows].sort((a, b) => {
+      const left = String(a[key] ?? "").toLowerCase();
+      const right = String(b[key] ?? "").toLowerCase();
+      if (left < right) return -1 * dir;
+      if (left > right) return 1 * dir;
+      return 0;
+    });
+  }, [members, debouncedSearch, sorting]);
+
+  const pageRows = filtered.slice(
+    pagination.pageIndex * pagination.pageSize,
+    pagination.pageIndex * pagination.pageSize + pagination.pageSize,
+  );
+
+  async function addMember(event: React.FormEvent) {
     event.preventDefault();
     if (!email.trim() || !canManage) return;
-    setBusyId("invite");
-    const { error } = await authClient.organization.inviteMember({
-      email: email.trim(),
-      role: inviteRole as "member" | "admin" | "owner",
+    setBusyId("add");
+    const response = await fetch("/api/organization/members", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), role: addRole }),
     });
     setBusyId(null);
-    if (error) {
-      toast.add({ title: "Invite failed", description: error.message });
+    const body = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+    if (!response.ok) {
+      toast.add({
+        title: "Could not add member",
+        description: body?.error ?? response.statusText,
+      });
       return;
     }
-    toast.add({ title: "Invitation sent", description: email.trim() });
+    toast.add({
+      title: "Member added",
+      description: `${email.trim()} is now in the organization.`,
+    });
     setEmail("");
     await loadMembers();
     router.refresh();
@@ -258,44 +326,74 @@ export function MembersSettings() {
     router.refresh();
   }
 
+  async function leaveOrganization() {
+    if (!organizationId || isSoleOwner) return;
+    setBusyId("leave");
+    const { error } = await authClient.organization.leave({ organizationId });
+    setBusyId(null);
+    if (error) {
+      toast.add({ title: "Could not leave", description: error.message });
+      return;
+    }
+    toast.add({ title: "Left organization" });
+    router.replace("/protected/dashboard");
+    router.refresh();
+  }
+
+  async function confirmDeleteOrganization() {
+    if (!organizationId || !canManage) return;
+    setBusyId("delete");
+    const { error } = await authClient.organization.delete({ organizationId });
+    setBusyId(null);
+    if (error) {
+      toast.add({ title: "Could not delete", description: error.message });
+      return;
+    }
+    setDeleteOpen(false);
+    toast.add({ title: "Organization deleted" });
+    router.replace("/protected/dashboard");
+    router.refresh();
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Manage members for {payload?.organizationName ?? "your organization"}.
+          Manage members for {organizationName}.
         </p>
       </div>
 
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invite member</CardTitle>
+            <CardTitle>Add member</CardTitle>
             <CardDescription>
-              Send an invitation email to add someone to this organization.
+              Add someone who already signed in with Google. They join
+              immediately — no invite link.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={inviteMember}>
+            <form onSubmit={(event) => void addMember(event)}>
               <FieldGroup className="gap-4 md:flex-row md:items-end">
                 <Field className="flex-1">
-                  <FieldLabel htmlFor="invite-email">Email</FieldLabel>
+                  <FieldLabel htmlFor="member-email">Email</FieldLabel>
                   <Input
-                    id="invite-email"
+                    id="member-email"
                     type="email"
                     required
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="colleague@company.com"
-                    disabled={busyId === "invite"}
+                    disabled={busyId === "add"}
                   />
                 </Field>
                 <Field className="w-full md:w-40">
                   <FieldLabel>Role</FieldLabel>
                   <Select
-                    value={inviteRole}
+                    value={addRole}
                     onValueChange={(value) => {
-                      if (value) setInviteRole(value);
+                      if (value) setAddRole(value);
                     }}
                   >
                     <SelectTrigger>
@@ -310,11 +408,11 @@ export function MembersSettings() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Button type="submit" disabled={busyId === "invite"}>
-                  {busyId === "invite" ? (
+                <Button type="submit" disabled={busyId === "add"}>
+                  {busyId === "add" ? (
                     <Spinner data-icon="inline-start" />
                   ) : null}
-                  Invite
+                  Add
                 </Button>
               </FieldGroup>
             </form>
@@ -325,9 +423,7 @@ export function MembersSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Members</CardTitle>
-          <CardDescription>
-            Search is debounced. Sorting and pagination hit the members API.
-          </CardDescription>
+          <CardDescription>Search, sort, and page through members.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <Field>
@@ -340,14 +436,14 @@ export function MembersSettings() {
             />
           </Field>
 
-          {loading && !payload ? (
+          {loading && members.length === 0 ? (
             <MembersTableSkeleton />
           ) : (
             <div className={loading ? "opacity-60" : undefined}>
               <DataTable
                 columns={memberColumns}
-                data={payload?.data ?? []}
-                rowCount={payload?.total ?? 0}
+                data={pageRows}
+                rowCount={filtered.length}
                 pagination={pagination}
                 onPaginationChange={setPagination}
                 sorting={sorting}
@@ -368,39 +464,99 @@ export function MembersSettings() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+          <CardDescription>
+            Leave this organization, or delete it if you manage it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {!isSoleOwner ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!organizationId || busyId === "leave"}
+              onClick={() => void leaveOrganization()}
+            >
+              {busyId === "leave" ? (
+                <Spinner data-icon="inline-start" />
+              ) : null}
+              Leave organization
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You are the only owner. Delete the organization or make someone
+              else an owner before leaving.
+            </p>
+          )}
+          {canManage ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!organizationId || busyId === "delete"}
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete organization
+            </Button>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete organization?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes &quot;{organizationName}&quot; and removes
+              all members. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyId === "delete"}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busyId === "delete"}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDeleteOrganization();
+              }}
+            >
+              {busyId === "delete" ? (
+                <Spinner data-icon="inline-start" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-function MembersTableSkeleton({ className }: { className?: string }) {
+function MembersTableSkeleton() {
   return (
-    <div className={className}>
-      <div className="overflow-hidden rounded-md border">
-        <div className="flex gap-4 border-b px-4 py-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="ms-auto h-4 w-20" />
-        </div>
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div
-            key={index}
-            className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
-          >
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="ms-auto h-7 w-24" />
-          </div>
-        ))}
+    <div className="overflow-hidden rounded-md border">
+      <div className="flex gap-4 border-b px-4 py-3">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="ms-auto h-4 w-20" />
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <Skeleton className="h-3 w-36" />
-        <div className="flex gap-2">
-          <Skeleton className="h-7 w-20" />
-          <Skeleton className="h-7 w-16" />
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
+        >
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="ms-auto h-7 w-24" />
         </div>
-      </div>
+      ))}
     </div>
   );
 }

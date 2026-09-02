@@ -17,158 +17,203 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient } from "@/lib/auth/client";
-
-type Organization = {
-  id: string;
-  name: string;
-  slug: string;
-};
+import type { Organization } from "@/lib/types";
 
 function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "org"
+  );
 }
 
-export function OrganizationDialog({ userId }: { userId: string }) {
+/** Create-organization dialog (optional first-run / switcher). */
+export function OrganizationDialog({
+  open,
+  onOpenChange,
+  title = "Create organization",
+  description = "You will be the owner of this organization.",
+  required = false,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title?: string;
+  description?: string;
+  /** When true, dialog cannot be dismissed without creating an org. */
+  required?: boolean;
+  onCreated?: (organization: Organization) => void | Promise<void>;
+}) {
   const router = useRouter();
-  const [open, setOpen] = React.useState(false);
-  const [organizations, setOrganizations] = React.useState<Organization[]>([]);
   const [name, setName] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
-    const { data: orgs, error } = await authClient.organization.list();
-    if (error) {
-      toast.add({
-        title: "Could not load organizations",
-        description: error.message,
-      });
-      setLoading(false);
-      return;
-    }
-
-    const list = (orgs ?? []) as Organization[];
-    setOrganizations(list);
-
-    const session = await authClient.getSession();
-    const activeId = session.data?.session.activeOrganizationId ?? null;
-
-    // Force picker when user has no active organization
-    setOpen(!activeId);
-    setLoading(false);
-  }, [userId]);
-
   React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!open) setName("");
+  }, [open]);
 
-  async function selectOrganization(organizationId: string) {
-    setSubmitting(true);
-    const { error } = await authClient.organization.setActive({
-      organizationId,
-    });
-    setSubmitting(false);
-    if (error) {
-      toast.add({ title: "Could not select organization", description: error.message });
-      return;
-    }
-    setOpen(false);
-    router.refresh();
-  }
-
-  async function createOrganization(event: React.FormEvent) {
+  async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || submitting) return;
+
     setSubmitting(true);
-    const slug = slugify(name) || `org-${Date.now()}`;
     const { data, error } = await authClient.organization.create({
       name: name.trim(),
-      slug,
+      slug: `${slugify(name)}-${Date.now().toString(36)}`,
+      keepCurrentActiveOrganization: false,
     });
-    if (error) {
-      setSubmitting(false);
-      toast.add({ title: "Could not create organization", description: error.message });
+    setSubmitting(false);
+
+    if (error || !data) {
+      toast.add({
+        title: "Could not create organization",
+        description: error?.message ?? "Something went wrong",
+      });
       return;
     }
-    if (data?.id) {
-      await authClient.organization.setActive({ organizationId: data.id });
-    }
-    setSubmitting(false);
-    setName("");
-    setOpen(false);
+
+    const organization: Organization = {
+      id: data.id,
+      name: data.name,
+      slug: data.slug,
+    };
+
+    toast.add({
+      title: "Organization created",
+      description: `You’re the owner of ${organization.name}.`,
+    });
+    onOpenChange(false);
+    await onCreated?.(organization);
     router.refresh();
   }
 
   return (
-    <Dialog open={open}>
-      <DialogContent showCloseButton={false} className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && required) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent
+        showCloseButton={!required}
+        className="sm:max-w-md"
+      >
         <DialogHeader>
-          <DialogTitle>Select organization</DialogTitle>
-          <DialogDescription>
-            Choose an organization to continue, or create a new one.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex flex-col gap-3 py-2">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-3/4" />
-            <Skeleton className="mt-2 h-7 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {organizations.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {organizations.map((org) => (
-                  <Button
-                    key={org.id}
-                    variant="outline"
-                    className="justify-start"
-                    disabled={submitting}
-                    onClick={() => void selectOrganization(org.id)}
-                  >
-                    {org.name}
-                  </Button>
-                ))}
-              </div>
-            ) : null}
-
-            <form onSubmit={createOrganization}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="org-name">Organization name</FieldLabel>
-                  <Input
-                    id="org-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Acme Inc"
-                    required
-                    disabled={submitting}
-                  />
-                </Field>
-                <DialogFooter>
-                  <Button type="submit" disabled={submitting || !name.trim()}>
-                    {submitting ? <Spinner data-icon="inline-start" /> : null}
-                    Create organization
-                  </Button>
-                </DialogFooter>
-              </FieldGroup>
-            </form>
-          </div>
-        )}
+        <form onSubmit={(event) => void onSubmit(event)}>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="create-org-name">
+                Organization name
+              </FieldLabel>
+              <Input
+                id="create-org-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Acme Inc"
+                required
+                autoFocus
+                disabled={submitting}
+              />
+            </Field>
+            <DialogFooter>
+              <Button type="submit" disabled={submitting || !name.trim()}>
+                {submitting ? <Spinner data-icon="inline-start" /> : null}
+                Create organization
+              </Button>
+            </DialogFooter>
+          </FieldGroup>
+        </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * First-run gate: force create when the user has zero orgs;
+ * otherwise ensure an active org and resume.
+ */
+export function OrganizationGate({ userId }: { userId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrap() {
+      const [{ data: orgs, error }, session] = await Promise.all([
+        authClient.organization.list(),
+        authClient.getSession({ query: { disableCookieCache: true } }),
+      ]);
+
+      if (cancelled) return;
+
+      if (error) {
+        toast.add({
+          title: "Could not load organizations",
+          description: error.message,
+        });
+        setReady(true);
+        return;
+      }
+
+      const list = (orgs ?? []) as Organization[];
+      const activeId = session.data?.session.activeOrganizationId ?? null;
+
+      if (list.length === 0) {
+        setOpen(true);
+        setReady(true);
+        return;
+      }
+
+      if (!activeId || !list.some((org) => org.id === activeId)) {
+        const { error: activeError } = await authClient.organization.setActive({
+          organizationId: list[0]!.id,
+        });
+        if (activeError) {
+          toast.add({
+            title: "Could not resume organization",
+            description: activeError.message,
+          });
+        } else {
+          router.refresh();
+        }
+      }
+
+      setOpen(false);
+      setReady(true);
+    }
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, userId]);
+
+  if (!ready) return null;
+
+  return (
+    <OrganizationDialog
+      open={open}
+      onOpenChange={setOpen}
+      required
+      title="Create your organization"
+      description="You need an organization to continue. You will be the owner."
+      onCreated={async () => {
+        setOpen(false);
+        router.refresh();
+      }}
+    />
   );
 }
