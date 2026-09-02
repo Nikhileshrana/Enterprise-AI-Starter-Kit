@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
-import { auth } from "@/lib/auth";
-import { assertBlobPath } from "@/lib/blob";
+import { auth } from "@/lib/auth/server";
+import { assertBlobPath } from "@/lib/blob/path";
 
 /**
  * Stream a private blob to an authenticated user.

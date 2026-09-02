@@ -1,6 +1,6 @@
 import { MongoClient, type MongoClientOptions } from "mongodb";
 import { attachDatabasePool } from "@vercel/functions";
-import { ensureAuthIndexes } from "@/lib/auth-indexes";
+import { ensureAuthIndexes } from "@/lib/auth/indexes";
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {

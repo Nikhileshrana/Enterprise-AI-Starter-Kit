@@ -1,7 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { assertBlobPath } from "@/lib/blob";
+import { auth } from "@/lib/auth/server";
+import { assertBlobPath } from "@/lib/blob/path";
 
 /**
  * Client upload token exchange only — the file itself never hits this route.

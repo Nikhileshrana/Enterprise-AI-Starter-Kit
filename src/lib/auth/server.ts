@@ -3,7 +3,7 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
 import { bearer, organization } from "better-auth/plugins";
 import { waitUntil } from "@vercel/functions";
-import client, { db } from "@/lib/mongodb";
+import client, { db } from "@/lib/db/mongodb";
 
 export const auth = betterAuth({
   database: mongodbAdapter(db, {

@@ -2,7 +2,7 @@ import "server-only";
 
 import { cacheLife } from "next/cache";
 import { headers } from "next/headers";
-import { auth, type Session } from "@/lib/auth";
+import { auth, type Session } from "@/lib/auth/server";
 
 /**
  * Request-time session read for Cache Components.

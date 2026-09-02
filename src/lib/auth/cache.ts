@@ -1,8 +1,8 @@
 import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
-import { db } from "@/lib/mongodb";
-import { getCurrentSession } from "@/lib/auth-session";
+import { db } from "@/lib/db/mongodb";
+import { getCurrentSession } from "@/lib/auth/session";
 
 type OrganizationDoc = {
   id: string;

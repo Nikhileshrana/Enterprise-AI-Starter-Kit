@@ -1,7 +1,7 @@
 import "server-only";
 
 import { del } from "@vercel/blob";
-import { assertBlobPath, toBlobPath } from "@/lib/blob";
+import { assertBlobPath, toBlobPath } from "@/lib/blob/path";
 
 /**
  * Delete a blob by its URL (or relative/pathname under DB_NAME/).
