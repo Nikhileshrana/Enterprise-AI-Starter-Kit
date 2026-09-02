@@ -8,7 +8,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isAiGatewayConfigured } from "@/lib/ai/gateway";
+import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
 import { KeyRoundIcon } from "lucide-react";
 
 export default function AiPage() {
@@ -73,5 +73,5 @@ async function AiPageContent() {
     );
   }
 
-  return <AiChat />;
+  return <AiChat defaultModelId={getAiGatewayModel()} />;
 }

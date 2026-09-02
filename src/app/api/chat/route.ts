@@ -1,7 +1,8 @@
 import { createAgentUIStreamResponse } from "ai";
 import { headers } from "next/headers";
 import { starterKitAgent } from "@/lib/ai/agent";
-import { isAiGatewayConfigured } from "@/lib/ai/gateway";
+import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
+import { resolveChatModelId } from "@/lib/ai/models";
 import { auth } from "@/lib/auth/server";
 
 export const maxDuration = 60;
@@ -25,11 +26,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { messages } = (await request.json()) as { messages: unknown };
+  const body = (await request.json()) as {
+    messages?: unknown;
+    model?: unknown;
+  };
+
+  const modelId = resolveChatModelId(body.model, getAiGatewayModel());
 
   return createAgentUIStreamResponse({
     agent: starterKitAgent,
-    uiMessages: messages as never[],
+    uiMessages: (body.messages ?? []) as never[],
+    options: { modelId },
     sendReasoning: true,
   });
 }

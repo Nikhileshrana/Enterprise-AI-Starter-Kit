@@ -16,21 +16,24 @@ import {
   BrainIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
-  PaperclipIcon,
+  ImageIcon,
+  PlusIcon,
   SparklesIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
 import type { StarterKitUIMessage } from "@/lib/ai/agent";
+import {
+  CHAT_MODELS,
+  resolveChatModelId,
+  type ChatModelId,
+} from "@/lib/ai/models";
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
 import {
   Attachment,
-  AttachmentAction,
-  AttachmentActions,
   AttachmentContent,
   AttachmentDescription,
-  AttachmentGroup,
   AttachmentMedia,
   AttachmentTitle,
 } from "@/components/ui/attachment";
@@ -48,12 +51,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import {
   Message,
@@ -81,31 +78,71 @@ import {
   QuestionnaireSubmit,
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
+const SUPPORTED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
 const ACCEPTED_FILES =
-  "image/*,application/pdf,text/csv,.csv,image/png,image/jpeg,image/webp,image/gif";
+  "image/jpeg,image/jpg,image/png,image/gif,image/webp,application/pdf,text/csv,.csv,.pdf";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-function isAllowedFile(file: File) {
+function isCsvFile(file: File) {
   const type = file.type.toLowerCase();
   const name = file.name.toLowerCase();
+  return type === "text/csv" || name.endsWith(".csv");
+}
+
+function isPdfFile(file: File) {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  return type === "application/pdf" || name.endsWith(".pdf");
+}
+
+function isSupportedImage(file: File) {
+  const type = file.type.toLowerCase();
+  if (SUPPORTED_IMAGE_TYPES.has(type)) return true;
+  const name = file.name.toLowerCase();
   return (
-    type.startsWith("image/") ||
-    type === "application/pdf" ||
-    type === "text/csv" ||
-    name.endsWith(".csv") ||
-    name.endsWith(".pdf")
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".png") ||
+    name.endsWith(".gif") ||
+    name.endsWith(".webp")
   );
 }
 
+function isAllowedFile(file: File) {
+  return isSupportedImage(file) || isPdfFile(file) || isCsvFile(file);
+}
+
 function mediaTypeForFile(file: File) {
-  if (file.type) return file.type;
+  if (isPdfFile(file)) return "application/pdf";
+  if (isCsvFile(file)) return "text/csv";
+  const type = file.type.toLowerCase();
+  if (SUPPORTED_IMAGE_TYPES.has(type)) {
+    return type === "image/jpg" ? "image/jpeg" : type;
+  }
   const name = file.name.toLowerCase();
-  if (name.endsWith(".csv")) return "text/csv";
-  if (name.endsWith(".pdf")) return "application/pdf";
-  return "application/octet-stream";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".gif")) return "image/gif";
+  if (name.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
 }
 
 function formatBytes(bytes: number) {
@@ -118,20 +155,35 @@ function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
 }
 
-async function toFileUIParts(files: File[]): Promise<FileUIPart[]> {
-  return Promise.all(
-    files.map(async (file) => ({
-      type: "file" as const,
-      filename: file.name,
-      mediaType: mediaTypeForFile(file),
-      url: await readFileAsDataUrl(file),
-    })),
-  );
+/** Images + PDFs as file parts; CSV becomes prompt text (vision APIs only accept jpeg/png/gif/webp). */
+async function buildAttachmentPayload(files: File[]) {
+  const fileParts: FileUIPart[] = [];
+  const textChunks: string[] = [];
+
+  for (const file of files) {
+    if (isCsvFile(file)) {
+      const csv = await file.text();
+      textChunks.push(`\n\n--- Attached CSV: ${file.name} ---\n${csv}`);
+      continue;
+    }
+
+    if (isSupportedImage(file) || isPdfFile(file)) {
+      fileParts.push({
+        type: "file",
+        filename: file.name,
+        mediaType: mediaTypeForFile(file),
+        url: await readFileAsDataUrl(file),
+      });
+    }
+  }
+
+  return { fileParts, textChunks };
 }
 
 function sendAutomaticallyWhen({
@@ -145,28 +197,53 @@ function sendAutomaticallyWhen({
   );
 }
 
-export function AiChat() {
+export function AiChat({
+  defaultModelId,
+}: {
+  defaultModelId?: string;
+} = {}) {
   const [input, setInput] = React.useState("");
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
+  const [modelId, setModelId] = React.useState<ChatModelId>(() =>
+    resolveChatModelId(defaultModelId) as ChatModelId,
+  );
+  const modelIdRef = React.useRef(modelId);
+  modelIdRef.current = modelId;
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { messages, sendMessage, status, stop, error, addToolOutput, addToolApprovalResponse } =
-    useChat<StarterKitUIMessage>({
-      transport: new DefaultChatTransport({ api: "/api/chat" }),
-      sendAutomaticallyWhen,
-      async onToolCall({ toolCall }) {
-        if (toolCall.dynamic) return;
-        if (toolCall.toolName === "getBrowserTimezone") {
-          addToolOutput({
-            tool: "getBrowserTimezone",
-            toolCallId: toolCall.toolCallId,
-            output: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          });
-        }
-      },
-    });
+  const transport = React.useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: () => ({ model: modelIdRef.current }),
+      }),
+    [],
+  );
+  const {
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+    addToolOutput,
+    addToolApprovalResponse,
+  } = useChat<StarterKitUIMessage>({
+    transport,
+    sendAutomaticallyWhen,
+    async onToolCall({ toolCall }) {
+      if (toolCall.dynamic) return;
+      if (toolCall.toolName === "getBrowserTimezone") {
+        addToolOutput({
+          tool: "getBrowserTimezone",
+          toolCallId: toolCall.toolCallId,
+          output: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+      }
+    },
+  });
 
   const busy = status === "submitted" || status === "streaming";
+  const canSend = Boolean(input.trim() || pendingFiles.length > 0);
 
   function focusComposer() {
     requestAnimationFrame(() => {
@@ -181,7 +258,7 @@ export function AiChat() {
       if (!isAllowedFile(file)) {
         toast.add({
           title: "Unsupported file",
-          description: `${file.name} — use images, PDF, or CSV.`,
+          description: `${file.name} — use JPEG/PNG/GIF/WebP, PDF, or CSV.`,
         });
         continue;
       }
@@ -202,17 +279,18 @@ export function AiChat() {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const text = input.trim();
-    if ((!text && pendingFiles.length === 0) || busy) return;
+  async function onSubmit(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (!canSend || busy) return;
 
-    const files =
-      pendingFiles.length > 0 ? await toFileUIParts(pendingFiles) : undefined;
+    const { fileParts, textChunks } = await buildAttachmentPayload(pendingFiles);
+    const text = [input.trim(), ...textChunks].filter(Boolean).join("");
 
     sendMessage({
-      text: text || (files?.length ? "Please review the attached file(s)." : ""),
-      files,
+      text:
+        text ||
+        (fileParts.length > 0 ? "Please review the attached file(s)." : ""),
+      files: fileParts.length > 0 ? fileParts : undefined,
     });
     setInput("");
     setPendingFiles([]);
@@ -245,8 +323,8 @@ export function AiChat() {
                       </EmptyMedia>
                       <EmptyTitle>Start a conversation</EmptyTitle>
                       <EmptyDescription>
-                        Attach images, PDFs, or CSVs, or try weather, stocks, timezone,
-                        confirmation, or an org announcement.
+                        Attach JPEG/PNG/GIF/WebP, PDF, or CSV — or try tools like
+                        weather, stocks, and approvals.
                       </EmptyDescription>
                     </EmptyHeader>
                   </Empty>
@@ -259,11 +337,20 @@ export function AiChat() {
                     scrollAnchor={message.role === "user"}
                   >
                     <Message align={message.role === "user" ? "end" : "start"}>
-                      <MessageContent>
+                      <MessageContent
+                        className={
+                          message.role === "user" ? "items-end" : undefined
+                        }
+                      >
                         {message.role === "user" ? (
                           <MessageHeader>You</MessageHeader>
                         ) : null}
-                        <div className="flex w-full min-w-0 flex-col gap-2">
+                        <div
+                          className={cn(
+                            "flex w-full min-w-0 flex-col gap-2",
+                            message.role === "user" && "items-end",
+                          )}
+                        >
                           {message.parts.map((part, index) => (
                             <MessagePartView
                               key={`${message.id}-${index}`}
@@ -284,7 +371,8 @@ export function AiChat() {
                 {error ? (
                   <Marker>
                     <MarkerContent>
-                      {error.message || "Something went wrong with the AI request."}
+                      {error.message ||
+                        "Something went wrong with the AI request."}
                     </MarkerContent>
                   </Marker>
                 ) : null}
@@ -295,19 +383,10 @@ export function AiChat() {
         </MessageScrollerProvider>
       </div>
 
-      <form onSubmit={(event) => void onSubmit(event)} className="shrink-0 space-y-2 pb-1">
-        {pendingFiles.length > 0 ? (
-          <AttachmentGroup>
-            {pendingFiles.map((file, index) => (
-              <PendingFileAttachment
-                key={`${file.name}-${file.size}-${index}`}
-                file={file}
-                onRemove={() => removePendingFile(index)}
-              />
-            ))}
-          </AttachmentGroup>
-        ) : null}
-
+      <form
+        onSubmit={(event) => void onSubmit(event)}
+        className="shrink-0 px-1 pb-1"
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -321,25 +400,26 @@ export function AiChat() {
           }}
         />
 
-        <InputGroup className="h-auto items-end">
-          <InputGroupAddon align="block-start" className="pt-2">
-            <InputGroupButton
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Attach files"
-              disabled={busy}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <PaperclipIcon />
-            </InputGroupButton>
-          </InputGroupAddon>
-          <InputGroupTextarea
+        <div className="rounded-2xl border border-border bg-muted/40 shadow-sm transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
+          {pendingFiles.length > 0 ? (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {pendingFiles.map((file, index) => (
+                <PendingFileAttachment
+                  key={`${file.name}-${file.size}-${index}`}
+                  file={file}
+                  onRemove={() => removePendingFile(index)}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <Textarea
             ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Message the agent… (images, PDF, CSV)"
+            placeholder="How can I help you today?"
             rows={2}
+            className="min-h-20 border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
             onPaste={(event) => {
               const items = event.clipboardData?.files;
               if (items?.length) {
@@ -350,37 +430,73 @@ export function AiChat() {
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                void onSubmit(event);
+                void onSubmit();
               }
             }}
           />
-          <InputGroupAddon align="inline-end">
-            {busy ? (
-              <InputGroupButton
-                type="button"
-                size="icon-sm"
-                variant="secondary"
-                aria-label="Stop"
-                onClick={() => {
-                  stop();
-                  focusComposer();
+
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Attach files"
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <PlusIcon />
+            </Button>
+
+            <div className="flex min-w-0 items-center gap-2">
+              <Select
+                value={modelId}
+                onValueChange={(value) => {
+                  if (value) setModelId(resolveChatModelId(value) as ChatModelId);
                 }}
               >
-                <SquareIcon />
-              </InputGroupButton>
-            ) : (
-              <InputGroupButton
-                type="submit"
-                size="icon-sm"
-                variant="default"
-                aria-label="Send"
-                disabled={!input.trim() && pendingFiles.length === 0}
-              >
-                <ArrowUpIcon />
-              </InputGroupButton>
-            )}
-          </InputGroupAddon>
-        </InputGroup>
+                <SelectTrigger
+                  size="sm"
+                  className="max-w-44 border-0 bg-transparent shadow-none dark:bg-transparent"
+                  aria-label="Select model"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-52">
+                  <SelectGroup>
+                    {CHAT_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {busy ? (
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="secondary"
+                  aria-label="Stop"
+                  onClick={() => {
+                    stop();
+                    focusComposer();
+                  }}
+                >
+                  <SquareIcon />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="icon-sm"
+                  aria-label="Send"
+                  disabled={!canSend}
+                >
+                  <ArrowUpIcon />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </form>
     </div>
   );
@@ -410,13 +526,14 @@ function FilePartAttachment({
   const isCsv =
     mediaType === "text/csv" ||
     (part.filename?.toLowerCase().endsWith(".csv") ?? false);
+  const filename = part.filename ?? "Attachment";
 
   return (
-    <Attachment state="done" size="sm">
+    <Attachment state="done" size="sm" className="max-w-xs self-end">
       <AttachmentMedia variant={isImage ? "image" : "icon"}>
         {isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={part.url} alt={part.filename ?? "attachment"} />
+          <img src={part.url} alt={filename} />
         ) : isPdf ? (
           <FileTextIcon />
         ) : isCsv ? (
@@ -426,7 +543,7 @@ function FilePartAttachment({
         )}
       </AttachmentMedia>
       <AttachmentContent>
-        <AttachmentTitle>{part.filename ?? "Attachment"}</AttachmentTitle>
+        <AttachmentTitle>{filename}</AttachmentTitle>
         <AttachmentDescription>{mediaType}</AttachmentDescription>
       </AttachmentContent>
     </Attachment>
@@ -442,10 +559,13 @@ function PendingFileAttachment({
 }) {
   const mediaType = mediaTypeForFile(file);
   const isImage = mediaType.startsWith("image/");
+  const isPdf =
+    mediaType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
   const previewUrl = React.useMemo(
     () => (isImage ? URL.createObjectURL(file) : null),
     [file, isImage],
   );
+  const thumbLabel = file.name.replace(/\.[^.]+$/, "").slice(0, 5);
 
   React.useEffect(() => {
     return () => {
@@ -454,33 +574,44 @@ function PendingFileAttachment({
   }, [previewUrl]);
 
   return (
-    <Attachment state="done" size="sm">
-      <AttachmentMedia variant={isImage ? "image" : "icon"}>
+    <div className="flex max-w-72 min-w-52 items-center gap-2.5 rounded-xl border border-border bg-background/80 py-1.5 pe-1.5 ps-1.5">
+      <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
         {isImage && previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={file.name} />
-        ) : mediaType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? (
-          <FileTextIcon />
+          <img
+            src={previewUrl}
+            alt=""
+            className="size-full object-cover"
+          />
         ) : (
-          <FileSpreadsheetIcon />
+          <div className="flex size-full items-center justify-center text-muted-foreground">
+            {isPdf ? <FileTextIcon className="size-4" /> : isCsvFile(file) ? (
+              <FileSpreadsheetIcon className="size-4" />
+            ) : (
+              <ImageIcon className="size-4" />
+            )}
+          </div>
         )}
-      </AttachmentMedia>
-      <AttachmentContent>
-        <AttachmentTitle>{file.name}</AttachmentTitle>
-        <AttachmentDescription>
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/55 px-0.5 py-px text-[9px] leading-none text-white">
+          {thumbLabel}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate text-xs font-medium">{file.name}</p>
+        <p className="truncate text-[11px] text-muted-foreground">
           {mediaType} · {formatBytes(file.size)}
-        </AttachmentDescription>
-      </AttachmentContent>
-      <AttachmentActions>
-        <AttachmentAction
-          type="button"
-          aria-label={`Remove ${file.name}`}
-          onClick={onRemove}
-        >
-          <XIcon />
-        </AttachmentAction>
-      </AttachmentActions>
-    </Attachment>
+        </p>
+      </div>
+      <Button
+        type="button"
+        size="icon-xs"
+        variant="ghost"
+        aria-label={`Remove ${file.name}`}
+        onClick={onRemove}
+      >
+        <XIcon />
+      </Button>
+    </div>
   );
 }
 

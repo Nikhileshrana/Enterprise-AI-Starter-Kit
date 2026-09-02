@@ -1,3 +1,5 @@
+import { CHAT_MODELS, resolveChatModelId } from "@/lib/ai/models";
+
 /**
  * AI Gateway auth: AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN (via `vercel env pull`).
  * @see https://vercel.com/docs/ai-gateway
@@ -10,5 +12,8 @@ export function isAiGatewayConfigured(): boolean {
 }
 
 export function getAiGatewayModel(): string {
-  return process.env.AI_GATEWAY_MODEL?.trim() || "openai/gpt-5.4";
+  return resolveChatModelId(
+    process.env.AI_GATEWAY_MODEL?.trim(),
+    CHAT_MODELS[2].id,
+  );
 }
