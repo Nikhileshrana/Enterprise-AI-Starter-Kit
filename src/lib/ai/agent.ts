@@ -1,14 +1,7 @@
-import {
-  ToolLoopAgent,
-  isStepCount,
-  type InferAgentUIMessage,
-} from "ai";
+import { ToolLoopAgent, isStepCount } from "ai";
 import { getAiGatewayModel } from "@/lib/ai/gateway";
 import { agentTools } from "@/lib/ai/tools";
-
-export type StarterKitAgentCallOptions = {
-  modelId?: string;
-};
+import type { StarterKitAgentCallOptions } from "@/lib/types";
 
 /**
  * Tool-loop agent routed through Vercel AI Gateway (`provider/model` string).
@@ -40,5 +33,3 @@ Keep replies concise. Prefer tools over inventing weather, stock, or timezone da
     model: options?.modelId ?? rest.model ?? getAiGatewayModel(),
   }),
 });
-
-export type StarterKitUIMessage = InferAgentUIMessage<typeof starterKitAgent>;

@@ -21,7 +21,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient, getFreshSession, useSession } from "@/lib/auth/client";
-import type { Organization } from "@/lib/types";
+import type { Organization, OrganizationSwitcherProps } from "@/lib/types";
 import {
   AudioLinesIcon,
   CheckIcon,
@@ -32,9 +32,7 @@ import {
 
 export function OrganizationSwitcher({
   variant = "sidebar",
-}: {
-  variant?: "sidebar" | "logo";
-}) {
+}: OrganizationSwitcherProps) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const [organizations, setOrganizations] = React.useState<Organization[]>([]);

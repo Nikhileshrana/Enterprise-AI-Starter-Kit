@@ -2,14 +2,8 @@ import {
   LayoutDashboardIcon,
   Settings2Icon,
   SparklesIcon,
-  type LucideIcon,
 } from "lucide-react";
-
-export type NavItem = {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-};
+import type { NavItem } from "@/lib/types";
 
 export const PLATFORM_NAV_ITEMS: NavItem[] = [
   {

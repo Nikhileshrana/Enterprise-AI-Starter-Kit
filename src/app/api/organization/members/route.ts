@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth/server";
 import {
   ORGANIZATION_ROLES,
   isOrganizationManager,
+  type AddMemberRequest,
+  type AddMemberResult,
   type OrganizationRole,
 } from "@/lib/types";
 
@@ -43,10 +45,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    email?: string;
-    role?: string;
-  } | null;
+  const body = (await request.json().catch(() => null)) as AddMemberRequest | null;
 
   const email = body?.email?.trim().toLowerCase();
   const role = (body?.role?.trim() || "member") as OrganizationRole;
@@ -68,7 +67,8 @@ export async function POST(request: NextRequest) {
         body: { userId, role, organizationId },
         headers: requestHeaders,
       });
-      return NextResponse.json({ status: "added" as const, member });
+      const result: AddMemberResult = { status: "added", member };
+      return NextResponse.json(result);
     }
 
     const invitation = await auth.api.createInvitation({
@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
       headers: requestHeaders,
     });
 
-    return NextResponse.json({ status: "invited" as const, invitation });
+    const result: AddMemberResult = { status: "invited", invitation };
+    return NextResponse.json(result);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not add member";

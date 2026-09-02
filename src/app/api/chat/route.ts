@@ -2,8 +2,9 @@ import { createAgentUIStreamResponse } from "ai";
 import { headers } from "next/headers";
 import { starterKitAgent } from "@/lib/ai/agent";
 import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
-import { resolveChatModelId } from "@/lib/ai/models";
+import { resolveChatModelId } from "@/lib/types";
 import { auth } from "@/lib/auth/server";
+import type { ChatRequestBody } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -26,10 +27,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as {
-    messages?: unknown;
-    model?: unknown;
-  };
+  const body = (await request.json()) as ChatRequestBody;
 
   const modelId = resolveChatModelId(body.model, getAiGatewayModel());
 

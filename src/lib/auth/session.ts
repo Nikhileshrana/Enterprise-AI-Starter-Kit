@@ -2,7 +2,8 @@ import "server-only";
 
 import { cacheLife } from "next/cache";
 import { headers } from "next/headers";
-import { auth, type Session } from "@/lib/auth/server";
+import { auth } from "@/lib/auth/server";
+import type { CurrentUser, Session } from "@/lib/types";
 
 /**
  * Request-time session read for Cache Components.
@@ -20,12 +21,6 @@ export async function getCurrentSession(): Promise<Session | null> {
     query: { disableCookieCache: true },
   });
 }
-
-export type CurrentUser = {
-  id: string;
-  name: string;
-  image?: string | null;
-};
 
 /**
  * Narrow user for Server Components — avoids exposing full session to clients.

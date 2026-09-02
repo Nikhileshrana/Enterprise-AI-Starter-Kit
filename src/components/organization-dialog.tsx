@@ -20,7 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient, getFreshSession } from "@/lib/auth/client";
-import type { Organization } from "@/lib/types";
+import type {
+  Organization,
+  OrganizationDialogProps,
+  OrganizationGateProps,
+} from "@/lib/types";
 
 function slugify(value: string) {
   return (
@@ -41,15 +45,7 @@ export function OrganizationDialog({
   description = "You will be the owner of this organization.",
   required = false,
   onCreated,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title?: string;
-  description?: string;
-  /** When true, dialog cannot be dismissed without creating an org. */
-  required?: boolean;
-  onCreated?: (organization: Organization) => void | Promise<void>;
-}) {
+}: OrganizationDialogProps) {
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
@@ -143,7 +139,7 @@ export function OrganizationDialog({
  * First-run gate: accept pending invitations, force create when the user has
  * zero orgs, otherwise ensure an active org and resume.
  */
-export function OrganizationGate({ userId }: { userId: string }) {
+export function OrganizationGate({ userId }: OrganizationGateProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [ready, setReady] = React.useState(false);

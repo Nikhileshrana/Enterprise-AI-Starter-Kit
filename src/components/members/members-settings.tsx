@@ -46,20 +46,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient, useSession } from "@/lib/auth/client";
 import {
+  isAddMemberResult,
   isOrganizationManager,
   roleHas,
-  toDate,
+  type AddMemberResponse,
   type InvitationRow,
   type MemberRow,
+  type MemberTableMeta,
 } from "@/lib/types";
-
-type MemberTableMeta = {
-  currentUserId?: string;
-  canManage: boolean;
-  busyId: string | null;
-  onMakeOwner: (member: MemberRow) => void;
-  onRemove: (member: MemberRow) => void;
-};
 
 const columnHelper = createDataTableColumnHelper<MemberRow>();
 
@@ -146,28 +140,6 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
-function mapMember(member: {
-  id: string;
-  role: string;
-  userId: string;
-  createdAt?: Date | string | null;
-  user?: {
-    name?: string;
-    email?: string;
-    image?: string | null;
-  };
-}): MemberRow {
-  return {
-    id: member.id,
-    role: member.role,
-    userId: member.userId,
-    name: member.user?.name ?? "",
-    email: member.user?.email ?? "",
-    image: member.user?.image ?? null,
-    createdAt: toDate(member.createdAt),
-  };
-}
-
 export function MembersSettings() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -222,12 +194,22 @@ export function MembersSettings() {
           email: invite.email,
           role: invite.role,
           status: invite.status,
-          expiresAt: toDate(invite.expiresAt),
         }),
       );
 
     setCurrentRole(activeMember.data?.role ?? null);
-    setMembers((listed.data?.members ?? []).map(mapMember));
+    setMembers(
+      (listed.data?.members ?? []).map(
+        (member): MemberRow => ({
+          id: member.id,
+          role: member.role,
+          userId: member.userId,
+          name: member.user.name,
+          email: member.user.email,
+          image: member.user.image ?? null,
+        }),
+      ),
+    );
     setInvitations(pending);
     setOrganizationId(fullOrg.data?.id ?? null);
     setOrganizationName(fullOrg.data?.name ?? "Organization");
@@ -266,19 +248,10 @@ export function MembersSettings() {
     const key = (sort?.id ?? "name") as keyof MemberRow;
     const dir = sort?.desc ? -1 : 1;
     return [...rows].sort((a, b) => {
-      const left = a[key];
-      const right = b[key];
-      if (left instanceof Date || right instanceof Date) {
-        const leftTime = left instanceof Date ? left.getTime() : 0;
-        const rightTime = right instanceof Date ? right.getTime() : 0;
-        if (leftTime < rightTime) return -1 * dir;
-        if (leftTime > rightTime) return 1 * dir;
-        return 0;
-      }
-      const leftText = String(left ?? "").toLowerCase();
-      const rightText = String(right ?? "").toLowerCase();
-      if (leftText < rightText) return -1 * dir;
-      if (leftText > rightText) return 1 * dir;
+      const left = String(a[key] ?? "").toLowerCase();
+      const right = String(b[key] ?? "").toLowerCase();
+      if (left < right) return -1 * dir;
+      if (left > right) return 1 * dir;
       return 0;
     });
   }, [members, debouncedSearch, sorting]);
@@ -299,21 +272,19 @@ export function MembersSettings() {
       body: JSON.stringify({ email: email.trim(), role: addRole }),
     });
     setBusyId(null);
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-      status?: "added" | "invited";
-    } | null;
-    if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as AddMemberResponse | null;
+    if (!response.ok || !body || !isAddMemberResult(body)) {
       toast.add({
         title: "Could not add member",
-        description: body?.error ?? response.statusText,
+        description:
+          body && "error" in body ? body.error : response.statusText,
       });
       return;
     }
     toast.add({
-      title: body?.status === "invited" ? "Invitation sent" : "Member added",
+      title: body.status === "invited" ? "Invitation sent" : "Member added",
       description:
-        body?.status === "invited"
+        body.status === "invited"
           ? `${email.trim()} can join after signing in with Google.`
           : `${email.trim()} is now in the organization.`,
     });

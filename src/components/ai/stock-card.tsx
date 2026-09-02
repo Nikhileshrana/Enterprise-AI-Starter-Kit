@@ -1,8 +1,4 @@
-type StockCardProps = {
-  symbol: string;
-  price: number;
-  change: number;
-};
+import type { StockCardProps } from "@/lib/types";
 
 export function StockCard({ symbol, price, change }: StockCardProps) {
   const up = change >= 0;

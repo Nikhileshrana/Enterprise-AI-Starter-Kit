@@ -22,12 +22,13 @@ import {
   SquareIcon,
   XIcon,
 } from "lucide-react";
-import type { StarterKitUIMessage } from "@/lib/ai/agent";
-import {
-  CHAT_MODELS,
-  resolveChatModelId,
-  type ChatModelId,
-} from "@/lib/ai/models";
+import type {
+  ChatHelpers,
+  ChatModelId,
+  MessagePartViewProps,
+  StarterKitUIMessage,
+} from "@/lib/types";
+import { CHAT_MODELS, resolveChatModelId } from "@/lib/types";
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
 import {
@@ -615,22 +616,12 @@ function PendingFileAttachment({
   );
 }
 
-type ChatHelpers = {
-  addToolOutput: ReturnType<typeof useChat<StarterKitUIMessage>>["addToolOutput"];
-  addToolApprovalResponse: ReturnType<
-    typeof useChat<StarterKitUIMessage>
-  >["addToolApprovalResponse"];
-};
-
 function MessagePartView({
   role,
   part,
   addToolOutput,
   addToolApprovalResponse,
-}: ChatHelpers & {
-  role: StarterKitUIMessage["role"];
-  part: StarterKitUIMessage["parts"][number];
-}) {
+}: MessagePartViewProps) {
   if (isTextUIPart(part)) {
     if (!part.text) return null;
     const align = role === "user" ? "end" : "start";

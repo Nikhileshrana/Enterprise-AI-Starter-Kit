@@ -23,13 +23,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { signOut } from "@/lib/auth/client";
+import type { NavUserProps } from "@/lib/types";
 import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
-
-export type NavUserData = {
-  name: string;
-  email: string;
-  image?: string | null;
-};
 
 function initials(name: string) {
   return name
@@ -40,13 +35,7 @@ function initials(name: string) {
     .join("");
 }
 
-export function NavUser({
-  user,
-  variant = "sidebar",
-}: {
-  user: NavUserData;
-  variant?: "sidebar" | "header";
-}) {
+export function NavUser({ user, variant = "sidebar" }: NavUserProps) {
   const { isMobile } = useSidebar();
   const router = useRouter();
 

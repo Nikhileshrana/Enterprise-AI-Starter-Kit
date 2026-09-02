@@ -1,9 +1,4 @@
-type WeatherCardProps = {
-  location: string;
-  temperature: number;
-  weather: string;
-  unit?: string;
-};
+import type { WeatherCardProps } from "@/lib/types";
 
 export function WeatherCard({
   location,

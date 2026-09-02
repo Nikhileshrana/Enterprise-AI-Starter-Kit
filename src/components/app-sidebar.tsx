@@ -2,7 +2,8 @@
 
 import type { ComponentProps } from "react";
 import { NavMain } from "@/components/nav-main";
-import { NavUser, type NavUserData } from "@/components/nav-user";
+import { NavUser } from "@/components/nav-user";
+import type { NavUserData } from "@/lib/types";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { Separator } from "@/components/ui/separator";
 import {

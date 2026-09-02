@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PLATFORM_NAV_ITEMS } from "@/components/nav-items";
-import { NavUser, type NavUserData } from "@/components/nav-user";
+import { NavUser } from "@/components/nav-user";
+import type { NavUserData } from "@/lib/types";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { cn } from "@/lib/utils";
 
