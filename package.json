@@ -13,6 +13,7 @@
     "@base-ui/react": "^1.7.0",
     "@better-auth/mongo-adapter": "^1.7.2",
     "@shadcn/react": "^0.3.1",
+    "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.9.5",
     "better-auth": "^1.7.2",
     "class-variance-authority": "^0.7.1",
