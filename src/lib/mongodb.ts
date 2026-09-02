@@ -1,5 +1,6 @@
 import { MongoClient, type MongoClientOptions } from "mongodb";
 import { attachDatabasePool } from "@vercel/functions";
+import { ensureAuthIndexes } from "@/lib/auth-indexes";
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {
@@ -23,6 +24,11 @@ if (!dbName) {
 
 /** Shared DB handle — Better Auth collections live here */
 export const db = client.db(dbName);
+
+// Create recommended indexes once per cold start (createIndex is idempotent)
+void ensureAuthIndexes(db).catch((error) => {
+  console.error("[mongodb] Failed to ensure auth indexes:", error);
+});
 
 // Export a module-scoped MongoClient so it can be shared across functions.
 export default client;
