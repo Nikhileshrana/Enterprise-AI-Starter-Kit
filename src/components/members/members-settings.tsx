@@ -44,7 +44,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
-import { authClient, useSession } from "@/lib/auth/client";
+import { authClient, hardResetForOrganization, useSession } from "@/lib/auth/client";
 import {
   canDeleteOrganization,
   canManageMembers,
@@ -351,8 +351,7 @@ export function MembersSettings() {
       return;
     }
     toast.add({ title: "Left organization" });
-    router.replace("/protected/dashboard");
-    router.refresh();
+    hardResetForOrganization("/protected/dashboard");
   }
 
   async function confirmDeleteOrganization() {
@@ -366,8 +365,7 @@ export function MembersSettings() {
     }
     setDeleteOpen(false);
     toast.add({ title: "Organization deleted" });
-    router.replace("/protected/dashboard");
-    router.refresh();
+    hardResetForOrganization("/protected/dashboard");
   }
 
   return (

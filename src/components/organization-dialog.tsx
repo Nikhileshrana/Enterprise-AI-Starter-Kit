@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
-import { authClient } from "@/lib/auth/client";
+import { authClient, hardResetForOrganization } from "@/lib/auth/client";
 import type {
   Organization,
   OrganizationDialogProps,
@@ -46,7 +45,6 @@ export function OrganizationDialog({
   required = false,
   onCreated,
 }: OrganizationDialogProps) {
-  const router = useRouter();
   const [name, setName] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -64,9 +62,9 @@ export function OrganizationDialog({
       slug: `${slugify(name)}-${Date.now().toString(36)}`,
       keepCurrentActiveOrganization: false,
     });
-    setSubmitting(false);
 
     if (error || !data) {
+      setSubmitting(false);
       toast.add({
         title: "Could not create organization",
         description: error?.message ?? "Something went wrong",
@@ -86,7 +84,7 @@ export function OrganizationDialog({
     });
     onOpenChange(false);
     await onCreated?.(organization);
-    router.refresh();
+    hardResetForOrganization("/protected/dashboard");
   }
 
   return (
@@ -140,7 +138,6 @@ export function OrganizationDialog({
  * zero orgs, otherwise ensure an active org and resume.
  */
 export function OrganizationGate({ userId }: OrganizationGateProps) {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [ready, setReady] = React.useState(false);
 
@@ -196,7 +193,8 @@ export function OrganizationGate({ userId }: OrganizationGateProps) {
             description: activeError.message,
           });
         } else {
-          router.refresh();
+          hardResetForOrganization();
+          return;
         }
       }
 
@@ -208,7 +206,7 @@ export function OrganizationGate({ userId }: OrganizationGateProps) {
     return () => {
       cancelled = true;
     };
-  }, [router, userId]);
+  }, [userId]);
 
   if (!ready) return null;
 
@@ -219,9 +217,8 @@ export function OrganizationGate({ userId }: OrganizationGateProps) {
       required
       title="Create your organization"
       description="You need an organization to continue. You will be the owner."
-      onCreated={async () => {
+      onCreated={() => {
         setOpen(false);
-        router.refresh();
       }}
     />
   );

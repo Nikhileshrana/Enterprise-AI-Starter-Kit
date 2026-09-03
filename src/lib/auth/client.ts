@@ -14,3 +14,13 @@ export const authClient = createAuthClient({
 });
 
 export const { signIn, signOut, useSession } = authClient;
+
+/**
+ * Hard navigation after org create/switch so every route remounts with the
+ * new active organization (router.refresh() leaves client state stale).
+ */
+export function hardResetForOrganization(path?: string) {
+  window.location.assign(
+    path ?? `${window.location.pathname}${window.location.search}`,
+  );
+}

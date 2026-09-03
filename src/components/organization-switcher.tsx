@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { OrganizationDialog } from "@/components/organization-dialog";
 import {
   DropdownMenu,
@@ -20,7 +19,11 @@ import {
 } from "@/components/ui/sidebar";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { authClient, useSession } from "@/lib/auth/client";
+import {
+  authClient,
+  hardResetForOrganization,
+  useSession,
+} from "@/lib/auth/client";
 import type { Organization, OrganizationSwitcherProps } from "@/lib/types";
 import {
   AudioLinesIcon,
@@ -34,11 +37,11 @@ export function OrganizationSwitcher({
   variant = "sidebar",
 }: OrganizationSwitcherProps) {
   const { isMobile } = useSidebar();
-  const router = useRouter();
   const [organizations, setOrganizations] = React.useState<Organization[]>([]);
   const [activeOrgId, setActiveOrgId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [switching, setSwitching] = React.useState(false);
 
   const { data: session } = useSession();
 
@@ -74,19 +77,20 @@ export function OrganizationSwitcher({
   const activeOrg = organizations.find((org) => org.id === activeOrgId) ?? null;
 
   async function switchOrganization(organizationId: string) {
+    if (organizationId === activeOrgId || switching) return;
+    setSwitching(true);
     const { error } = await authClient.organization.setActive({
       organizationId,
     });
     if (error) {
+      setSwitching(false);
       toast.add({
         title: "Could not switch organization",
         description: error.message,
       });
       return;
     }
-    setActiveOrgId(organizationId);
-    await load();
-    router.refresh();
+    hardResetForOrganization();
   }
 
   const menuContent = (
@@ -132,10 +136,6 @@ export function OrganizationSwitcher({
     <OrganizationDialog
       open={createOpen}
       onOpenChange={setCreateOpen}
-      onCreated={async (organization) => {
-        setActiveOrgId(organization.id);
-        await load();
-      }}
     />
   );
 
