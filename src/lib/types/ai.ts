@@ -40,6 +40,19 @@ export type WeatherCardProps = {
   unit?: string;
 };
 
+export type PerplexitySearchResultItem = {
+  title: string;
+  url: string;
+  snippet: string;
+  date?: string;
+  lastUpdated?: string;
+};
+
+export type PerplexitySearchCardProps = {
+  query: string;
+  results: PerplexitySearchResultItem[];
+};
+
 export type ChatRequestBody = {
   messages?: unknown;
   model?: unknown;

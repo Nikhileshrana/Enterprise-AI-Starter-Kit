@@ -1,4 +1,4 @@
-import { tool } from "ai";
+import { gateway, tool } from "ai";
 import { z } from "zod";
 
 /** Server tool — generative UI for weather. */
@@ -108,7 +108,7 @@ export const askQuestionnaire = tool({
  */
 export const createDocument = tool({
   description:
-    "Generate an interactive document, report, proposal, flyer, resume, newsletter, or HTML design artifact. Always use rich HTML formatting inside content for headers, tables, styled containers, and typography.",
+    "Generate an interactive document, report, proposal, flyer, resume, newsletter, or HTML design artifact. Always use rich HTML formatting inside content for headers, tables, styled containers, and typography.\n\nDEFAULT STYLE (use unless the user specifies otherwise):\nUse these CSS classes for a clean editorial PDF look:\n- <div class=\"doc-meta\"><span>REPORT</span><span>THURSDAY, SEPTEMBER 3 2026</span></div> — top meta row with label (left) and date (right)\n- <h1 class=\"doc-title\">Title Here</h1> — large bold black title\n- <p class=\"doc-intro\">Grey introductory paragraph...</p> — grey intro text\n- <span class=\"section-title\">I. Section Name</span> — section header with underline (use roman numerals)\n- <div class=\"doc-grid\"><div class=\"doc-grid-left\"><div class=\"sub-heading\">1. Sub-heading</div><span class=\"badge\">BADGE TEXT</span></div><div class=\"doc-grid-right\">...body content...</div></div> — two-column layout with left labels + right body\n- Use <strong> for bold lead-ins, <ul><li> for bullets, <code> for inline code/technical terms\n- Keep generous spacing, clean sans-serif feel, professional editorial layout",
   inputSchema: z.object({
     title: z.string().describe("Descriptive document or artifact title"),
     kind: z
@@ -130,6 +130,16 @@ export const createDocument = tool({
   },
 });
 
+/**
+ * Provider-executed Perplexity Search via Vercel AI Gateway.
+ * Works with any chat model — Gateway routes the search to Perplexity.
+ * @see https://vercel.com/docs/ai-gateway/models-and-providers/web-search
+ */
+export const perplexity_search = gateway.tools.perplexitySearch({
+  maxResults: 8,
+  searchLanguageFilter: ["en"],
+});
+
 export const agentTools = {
   displayWeather,
   getStockPrice,
@@ -138,4 +148,5 @@ export const agentTools = {
   getBrowserTimezone,
   askQuestionnaire,
   createDocument,
+  perplexity_search,
 };

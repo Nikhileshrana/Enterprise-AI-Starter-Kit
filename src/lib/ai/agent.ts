@@ -17,10 +17,11 @@ export const starterKitAgent = new ToolLoopAgent<
   instructions: `You are the Starter Kit assistant inside a multi-tenant app.
 Use tools when they help: weather and stock cards for live-feeling UI, timezone from the browser,
 confirmation / questionnaire for human-in-the-loop, draftOrgAnnouncement only when the user
-asks to announce something, and createDocument whenever the user asks to write, generate, or design
+asks to announce something, perplexity_search for current web facts / news / research (do not invent
+live information), and createDocument whenever the user asks to write, generate, or design
 a document, report, proposal, flyer, resume, newsletter, HTML component, or online page.
 Users may attach images, PDFs, or CSV files — read and use their contents when relevant.
-Keep replies concise. Prefer tools over inventing weather, stock, or timezone data.`,
+Keep replies concise. Prefer tools over inventing weather, stock, timezone, or current-events data.`,
   tools: agentTools,
   stopWhen: isStepCount(12),
   reasoning: "medium",

@@ -38,6 +38,7 @@ import {
 } from "@/lib/ai/models";
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
+import { SearchCard } from "@/components/ai/search-card";
 import {
   Attachment,
   AttachmentContent,
@@ -104,9 +105,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import {
-  ArtifactDialog,
+  ArtifactPanel,
   type ArtifactData,
-} from "@/components/ai/artifact-dialog";
+} from "@/components/ai/artifact-panel";
 import type { ChatConversationMeta } from "@/lib/db/chat";
 import { cn } from "@/lib/utils";
 
@@ -223,8 +224,8 @@ export function AiChat({
 } = {}) {
   const [input, setInput] = React.useState("");
   const [pendingFiles, setPendingFiles] = React.useState<File[]>([]);
-  const [modelId, setModelId] = React.useState<ChatModelId>(() =>
-    resolveChatModelId(defaultModelId) as ChatModelId,
+  const [modelId, setModelId] = React.useState<ChatModelId>(
+    () => resolveChatModelId(defaultModelId) as ChatModelId,
   );
   const modelIdRef = React.useRef(modelId);
   modelIdRef.current = modelId;
@@ -238,14 +239,17 @@ export function AiChat({
       }),
     [],
   );
-  const [activeArtifact, setActiveArtifact] = React.useState<ArtifactData | null>(null);
-  const [artifactDialogOpen, setArtifactDialogOpen] = React.useState(false);
+  const [activeArtifact, setActiveArtifact] =
+    React.useState<ArtifactData | null>(null);
+  const [artifactPanelOpen, setArtifactPanelOpen] = React.useState(false);
   const lastOpenedArtifactIdRef = React.useRef<string | null>(null);
 
   const [conversationId, setConversationId] = React.useState<string>(
     () => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
   );
-  const [historyList, setHistoryList] = React.useState<ChatConversationMeta[]>([]);
+  const [historyList, setHistoryList] = React.useState<ChatConversationMeta[]>(
+    [],
+  );
   const [loadingHistory, setLoadingHistory] = React.useState(false);
   const [loadingChatId, setLoadingChatId] = React.useState<string | null>(null);
 
@@ -275,10 +279,10 @@ export function AiChat({
 
   function handleOpenArtifact(art: ArtifactData) {
     setActiveArtifact(art);
-    setArtifactDialogOpen(true);
+    setArtifactPanelOpen(true);
   }
 
-  // Auto-launch Artifact Dialog when a new createDocument tool call completes
+  // Auto-launch Artifact Panel when a new createDocument tool call completes
   React.useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
@@ -306,7 +310,9 @@ export function AiChat({
     try {
       const res = await fetch("/api/chat/history");
       if (res.ok) {
-        const data = (await res.json()) as { conversations?: ChatConversationMeta[] };
+        const data = (await res.json()) as {
+          conversations?: ChatConversationMeta[];
+        };
         setHistoryList(data.conversations || []);
       }
     } catch (err) {
@@ -425,7 +431,8 @@ export function AiChat({
     event?.preventDefault();
     if (!canSend || busy) return;
 
-    const { fileParts, textChunks } = await buildAttachmentPayload(pendingFiles);
+    const { fileParts, textChunks } =
+      await buildAttachmentPayload(pendingFiles);
     const text = [input.trim(), ...textChunks].filter(Boolean).join("");
 
     sendMessage({
@@ -451,276 +458,297 @@ export function AiChat({
   }, []);
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-4xl flex-1 flex-col gap-3 overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <MessageScrollerProvider autoScroll>
-          <MessageScroller className="min-h-0 flex-1 overflow-hidden">
-            <MessageScrollerViewport>
-              <MessageScrollerContent className="p-4">
-                {messages.length === 0 ? (
-                  <Empty className="border-0">
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <SparklesIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>Start a conversation</EmptyTitle>
-                      <EmptyDescription>
-                        Attach JPEG/PNG/GIF/WebP, PDF, or CSV — or try tools like
-                        weather, stocks, and approvals.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                ) : null}
+    <div className="flex flex-row! h-full min-h-0 w-full flex-1 items-stretch gap-3 overflow-hidden p-3 sm:p-4">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-4xl flex-col gap-3 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <MessageScrollerProvider autoScroll>
+              <MessageScroller className="min-h-0 flex-1 overflow-hidden">
+                <MessageScrollerViewport>
+                  <MessageScrollerContent className="p-4">
+                    {messages.length === 0 ? (
+                      <Empty className="border-0">
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <SparklesIcon />
+                          </EmptyMedia>
+                          <EmptyTitle>Start a conversation</EmptyTitle>
+                          <EmptyDescription>
+                            Attach JPEG/PNG/GIF/WebP, PDF, or CSV — or try tools
+                            like weather, stocks, and approvals.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : null}
 
-                {messages.map((message) => (
-                  <MessageScrollerItem
-                    key={message.id}
-                    messageId={message.id}
-                    scrollAnchor={message.role === "user"}
-                  >
-                    <Message align={message.role === "user" ? "end" : "start"}>
-                      <MessageContent
-                        className={
-                          message.role === "user" ? "items-end" : undefined
-                        }
+                    {messages.map((message) => (
+                      <MessageScrollerItem
+                        key={message.id}
+                        messageId={message.id}
+                        scrollAnchor={message.role === "user"}
                       >
-                        {message.role === "user" ? (
-                          <MessageHeader>You</MessageHeader>
-                        ) : null}
-                        <div
-                          className={cn(
-                            "flex w-full min-w-0 flex-col gap-2",
-                            message.role === "user" && "items-end",
-                          )}
+                        <Message
+                          align={message.role === "user" ? "end" : "start"}
                         >
-                          {message.parts.map((part, index) => (
-                            <MessagePartView
-                              key={`${message.id}-${index}`}
-                              role={message.role}
-                              part={part}
-                              addToolOutput={addToolOutput}
-                              addToolApprovalResponse={addToolApprovalResponse}
-                              onOpenArtifact={handleOpenArtifact}
-                            />
-                          ))}
-                        </div>
-                      </MessageContent>
-                    </Message>
-                  </MessageScrollerItem>
-                ))}
+                          <MessageContent
+                            className={
+                              message.role === "user" ? "items-end" : undefined
+                            }
+                          >
+                            {message.role === "user" ? (
+                              <MessageHeader>You</MessageHeader>
+                            ) : null}
+                            <div
+                              className={cn(
+                                "flex w-full min-w-0 flex-col gap-2",
+                                message.role === "user" && "items-end",
+                              )}
+                            >
+                              {message.parts.map((part, index) => (
+                                <MessagePartView
+                                  key={`${message.id}-${index}`}
+                                  role={message.role}
+                                  part={part}
+                                  addToolOutput={addToolOutput}
+                                  addToolApprovalResponse={
+                                    addToolApprovalResponse
+                                  }
+                                  onOpenArtifact={handleOpenArtifact}
+                                />
+                              ))}
+                            </div>
+                          </MessageContent>
+                        </Message>
+                      </MessageScrollerItem>
+                    ))}
 
-                {status === "submitted" ? <AssistantPendingSkeleton /> : null}
+                    {status === "submitted" ? (
+                      <AssistantPendingSkeleton />
+                    ) : null}
 
-                {error ? (
-                  <Marker>
-                    <MarkerContent>
-                      {error.message ||
-                        "Something went wrong with the AI request."}
-                    </MarkerContent>
-                  </Marker>
-                ) : null}
-              </MessageScrollerContent>
-            </MessageScrollerViewport>
-            <MessageScrollerButton />
-          </MessageScroller>
-        </MessageScrollerProvider>
-      </div>
+                    {error ? (
+                      <Marker>
+                        <MarkerContent>
+                          {error.message ||
+                            "Something went wrong with the AI request."}
+                        </MarkerContent>
+                      </Marker>
+                    ) : null}
+                  </MessageScrollerContent>
+                </MessageScrollerViewport>
+                <MessageScrollerButton />
+              </MessageScroller>
+            </MessageScrollerProvider>
+          </div>
 
-      <form
-        onSubmit={(event) => void onSubmit(event)}
-        className="shrink-0 px-1 pb-1"
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="sr-only"
-          accept={ACCEPTED_FILES}
-          multiple
-          onChange={(event) => {
-            if (event.target.files?.length) {
-              addFiles(event.target.files);
-            }
-          }}
-        />
+          <form
+            onSubmit={(event) => void onSubmit(event)}
+            className="shrink-0 px-1 pb-1"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              accept={ACCEPTED_FILES}
+              multiple
+              onChange={(event) => {
+                if (event.target.files?.length) {
+                  addFiles(event.target.files);
+                }
+              }}
+            />
 
-        <div className="rounded-2xl border border-border bg-muted/40 shadow-xs transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
-          {pendingFiles.length > 0 ? (
-            <div className="flex flex-wrap gap-2 px-3 pt-3">
-              {pendingFiles.map((file, index) => (
-                <PendingFileAttachment
-                  key={`${file.name}-${file.size}-${index}`}
-                  file={file}
-                  onRemove={() => removePendingFile(index)}
-                />
-              ))}
-            </div>
-          ) : null}
+            <div className="rounded-2xl border border-border bg-muted/40 shadow-xs transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
+              {pendingFiles.length > 0 ? (
+                <div className="flex flex-wrap gap-2 px-3 pt-3">
+                  {pendingFiles.map((file, index) => (
+                    <PendingFileAttachment
+                      key={`${file.name}-${file.size}-${index}`}
+                      file={file}
+                      onRemove={() => removePendingFile(index)}
+                    />
+                  ))}
+                </div>
+              ) : null}
 
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="How can I help you today?"
-            rows={2}
-            className="min-h-20 border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-            onPaste={(event) => {
-              const items = event.clipboardData?.files;
-              if (items?.length) {
-                event.preventDefault();
-                addFiles(items);
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void onSubmit();
-              }
-            }}
-          />
-
-          <div className="flex items-center justify-between gap-2 px-2 pb-2">
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Attach files"
-                disabled={busy}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <PlusIcon />
-              </Button>
-
-              <Popover
-                onOpenChange={(open) => {
-                  if (open) void fetchHistory();
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="How can I help you today?"
+                rows={2}
+                className="min-h-20 border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                onPaste={(event) => {
+                  const items = event.clipboardData?.files;
+                  if (items?.length) {
+                    event.preventDefault();
+                    addFiles(items);
+                  }
                 }}
-              >
-                <PopoverTrigger
-                  render={
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void onSubmit();
+                  }
+                }}
+              />
+
+              <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Attach files"
+                    disabled={busy}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <PlusIcon />
+                  </Button>
+
+                  <Popover
+                    onOpenChange={(open) => {
+                      if (open) void fetchHistory();
+                    }}
+                  >
+                    <PopoverTrigger
+                      render={
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label="Chat history"
+                          title="Recents"
+                          disabled={busy}
+                        >
+                          <RotateCcwIcon />
+                        </Button>
+                      }
+                    />
+                    <PopoverContent
+                      align="start"
+                      side="top"
+                      className="w-40 p-1.5"
+                    >
+                      <div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={startNewChat}
+                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <PlusIcon className="size-3.5" />
+                          <span>New Chat</span>
+                        </button>
+
+                        {loadingHistory ? (
+                          <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
+                            <Spinner className="me-2 size-3.5" /> Loading...
+                          </div>
+                        ) : historyList.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-muted-foreground">
+                            No saved chats yet
+                          </div>
+                        ) : (
+                          historyList.map((item) => (
+                            <div
+                              key={item.id}
+                              onClick={() => void loadConversation(item.id)}
+                              className={cn(
+                                "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-colors",
+                                item.id === conversationId
+                                  ? "bg-accent font-medium text-accent-foreground"
+                                  : "text-foreground hover:bg-muted/70",
+                              )}
+                            >
+                              <div className="me-2 min-w-0 flex-1">
+                                <p
+                                  className="truncate text-xs"
+                                  title={item.title}
+                                >
+                                  {loadingChatId === item.id
+                                    ? "Loading..."
+                                    : item.title}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="icon-xs"
+                                variant="ghost"
+                                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
+                                onClick={(e) =>
+                                  void handleDeleteChat(item.id, e)
+                                }
+                                title="Delete conversation"
+                              >
+                                <Trash2Icon className="size-3.5" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="flex min-w-0 items-center gap-2">
+                  <Select
+                    value={modelId}
+                    onValueChange={(value) => {
+                      if (value)
+                        setModelId(resolveChatModelId(value) as ChatModelId);
+                    }}
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      className="max-w-44 border-0 bg-transparent shadow-none dark:bg-transparent"
+                      aria-label="Select model"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="end" className="min-w-52">
+                      <SelectGroup>
+                        {CHAT_MODELS.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {busy ? (
                     <Button
                       type="button"
                       size="icon-sm"
-                      variant="ghost"
-                      aria-label="Chat history"
-                      title="Recents"
-                      disabled={busy}
+                      variant="secondary"
+                      aria-label="Stop"
+                      onClick={() => {
+                        stop();
+                        focusComposer();
+                      }}
                     >
-                      <RotateCcwIcon />
+                      <SquareIcon />
                     </Button>
-                  }
-                />
-                <PopoverContent align="start" side="top" className="w-40 p-1.5">
-                  <div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
-                    <button
-                      type="button"
-                      onClick={startNewChat}
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  ) : (
+                    <Button
+                      type="submit"
+                      size="icon-sm"
+                      aria-label="Send"
+                      disabled={!canSend}
                     >
-                      <PlusIcon className="size-3.5" />
-                      <span>New Chat</span>
-                    </button>
-
-                    {loadingHistory ? (
-                      <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
-                        <Spinner className="me-2 size-3.5" /> Loading...
-                      </div>
-                    ) : historyList.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-muted-foreground">
-                        No saved chats yet
-                      </div>
-                    ) : (
-                      historyList.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => void loadConversation(item.id)}
-                          className={cn(
-                            "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-colors",
-                            item.id === conversationId
-                              ? "bg-accent font-medium text-accent-foreground"
-                              : "text-foreground hover:bg-muted/70",
-                          )}
-                        >
-                          <div className="me-2 min-w-0 flex-1">
-                            <p className="truncate text-xs" title={item.title}>
-                              {loadingChatId === item.id ? "Loading..." : item.title}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="ghost"
-                            className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
-                            onClick={(e) => void handleDeleteChat(item.id, e)}
-                            title="Delete conversation"
-                          >
-                            <Trash2Icon className="size-3.5" />
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
+                      <ArrowUpIcon />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
-
-            <div className="flex min-w-0 items-center gap-2">
-              <Select
-                value={modelId}
-                onValueChange={(value) => {
-                  if (value) setModelId(resolveChatModelId(value) as ChatModelId);
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="max-w-44 border-0 bg-transparent shadow-none dark:bg-transparent"
-                  aria-label="Select model"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end" className="min-w-52">
-                  <SelectGroup>
-                    {CHAT_MODELS.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {busy ? (
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="secondary"
-                  aria-label="Stop"
-                  onClick={() => {
-                    stop();
-                    focusComposer();
-                  }}
-                >
-                  <SquareIcon />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  size="icon-sm"
-                  aria-label="Send"
-                  disabled={!canSend}
-                >
-                  <ArrowUpIcon />
-                </Button>
-              )}
-            </div>
-          </div>
+          </form>
         </div>
-      </form>
+      </div>
 
-      <ArtifactDialog
+      <ArtifactPanel
         artifact={activeArtifact}
-        open={artifactDialogOpen}
-        onOpenChange={setArtifactDialogOpen}
+        open={artifactPanelOpen}
+        onOpenChange={setArtifactPanelOpen}
       />
     </div>
   );
@@ -799,14 +827,12 @@ function PendingFileAttachment({
       <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
         {isImage && previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt=""
-            className="size-full object-cover"
-          />
+          <img src={previewUrl} alt="" className="size-full object-cover" />
         ) : (
           <div className="flex size-full items-center justify-center text-muted-foreground">
-            {isPdf ? <FileTextIcon className="size-4" /> : isCsvFile(file) ? (
+            {isPdf ? (
+              <FileTextIcon className="size-4" />
+            ) : isCsvFile(file) ? (
               <FileSpreadsheetIcon className="size-4" />
             ) : (
               <ImageIcon className="size-4" />
@@ -847,11 +873,10 @@ function MessagePartView({
     if (!part.text) return null;
     const align = role === "user" ? "end" : "start";
     return (
-      <Bubble
-        variant={role === "user" ? "default" : "muted"}
-        align={align}
-      >
-        <BubbleContent className="whitespace-pre-wrap">{part.text}</BubbleContent>
+      <Bubble variant={role === "user" ? "default" : "muted"} align={align}>
+        <BubbleContent className="whitespace-pre-wrap">
+          {part.text}
+        </BubbleContent>
       </Bubble>
     );
   }
@@ -865,9 +890,7 @@ function MessagePartView({
     return (
       <Collapsible className="w-full max-w-lg">
         <CollapsibleTrigger
-          render={
-            <Button variant="ghost" size="sm" className="gap-1.5 px-2" />
-          }
+          render={<Button variant="ghost" size="sm" className="gap-1.5 px-2" />}
         >
           <BrainIcon data-icon="inline-start" />
           Reasoning
@@ -898,41 +921,88 @@ function MessagePartView({
     );
   }
   if (part.type === "tool-askForConfirmation") {
-    return (
-      <ConfirmationToolPart part={part} addToolOutput={addToolOutput} />
-    );
+    return <ConfirmationToolPart part={part} addToolOutput={addToolOutput} />;
   }
   if (part.type === "tool-getBrowserTimezone") {
     return <TimezoneToolPart part={part} />;
   }
   if (part.type === "tool-askQuestionnaire") {
-    return (
-      <QuestionnaireToolPart part={part} addToolOutput={addToolOutput} />
-    );
+    return <QuestionnaireToolPart part={part} addToolOutput={addToolOutput} />;
   }
   if (part.type === "tool-createDocument") {
     return (
-      <DocumentArtifactToolPart
-        part={part}
-        onOpenArtifact={onOpenArtifact}
-      />
+      <DocumentArtifactToolPart part={part} onOpenArtifact={onOpenArtifact} />
     );
+  }
+  if (part.type === "tool-perplexity_search") {
+    return <PerplexitySearchToolPart part={part} />;
   }
 
   return null;
+}
+
+function formatSearchQuery(query: unknown): string {
+  if (typeof query === "string" && query.trim()) return query;
+  if (Array.isArray(query)) {
+    return query.filter((item): item is string => typeof item === "string").join(" · ") || "Web search";
+  }
+  return "Web search";
+}
+
+function PerplexitySearchToolPart({
+  part,
+}: {
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-perplexity_search" }
+  >;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return (
+        <ToolPending
+          label={`Searching the web for ${formatSearchQuery(part.input?.query)}…`}
+        />
+      );
+    case "output-available": {
+      const output = part.output;
+      if (!output) return null;
+      if ("error" in output) {
+        return <ToolError text={output.message || "Search failed."} />;
+      }
+      return (
+        <SearchCard
+          query={formatSearchQuery(part.input?.query)}
+          results={output.results ?? []}
+        />
+      );
+    }
+    case "output-error":
+      return <ToolError text={part.errorText} />;
+    default:
+      return null;
+  }
 }
 
 function DocumentArtifactToolPart({
   part,
   onOpenArtifact,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-createDocument" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-createDocument" }
+  >;
   onOpenArtifact?: (artifact: ArtifactData) => void;
 }) {
   switch (part.state) {
     case "input-streaming":
     case "input-available":
-      return <ToolPending label={`Generating ${part.input?.title || "document artifact"}…`} />;
+      return (
+        <ToolPending
+          label={`Generating ${part.input?.title || "document artifact"}…`}
+        />
+      );
     case "output-available":
       if (!part.output) return null;
       return (
@@ -979,12 +1049,19 @@ function DocumentArtifactToolPart({
 function WeatherToolPart({
   part,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-displayWeather" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-displayWeather" }
+  >;
 }) {
   switch (part.state) {
     case "input-streaming":
     case "input-available":
-      return <ToolPending label={`Loading weather for ${part.input?.location ?? "…"}`} />;
+      return (
+        <ToolPending
+          label={`Loading weather for ${part.input?.location ?? "…"}`}
+        />
+      );
     case "output-available":
       return <WeatherCard {...part.output} />;
     case "output-error":
@@ -999,12 +1076,17 @@ function WeatherToolPart({
 function StockToolPart({
   part,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-getStockPrice" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-getStockPrice" }
+  >;
 }) {
   switch (part.state) {
     case "input-streaming":
     case "input-available":
-      return <ToolPending label={`Loading ${part.input?.symbol ?? "stock"}…`} />;
+      return (
+        <ToolPending label={`Loading ${part.input?.symbol ?? "stock"}…`} />
+      );
     case "output-available":
       return <StockCard {...part.output} />;
     case "output-error":
@@ -1019,7 +1101,10 @@ function StockToolPart({
 function TimezoneToolPart({
   part,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-getBrowserTimezone" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-getBrowserTimezone" }
+  >;
 }) {
   switch (part.state) {
     case "input-streaming":
@@ -1042,7 +1127,10 @@ function ConfirmationToolPart({
   part,
   addToolOutput,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-askForConfirmation" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-askForConfirmation" }
+  >;
   addToolOutput: ChatHelpers["addToolOutput"];
 }) {
   switch (part.state) {
@@ -1124,7 +1212,9 @@ function ApprovalToolPart({
             <p className="text-xs whitespace-pre-wrap">{part.input.body}</p>
           ) : null}
           {part.approval.requestReason ? (
-            <p className="text-xs text-muted-foreground">{part.approval.requestReason}</p>
+            <p className="text-xs text-muted-foreground">
+              {part.approval.requestReason}
+            </p>
           ) : null}
           <div className="flex gap-2">
             <Button
@@ -1183,7 +1273,10 @@ function QuestionnaireToolPart({
   part,
   addToolOutput,
 }: {
-  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-askQuestionnaire" }>;
+  part: Extract<
+    StarterKitUIMessage["parts"][number],
+    { type: "tool-askQuestionnaire" }
+  >;
   addToolOutput: ChatHelpers["addToolOutput"];
 }) {
   switch (part.state) {
@@ -1218,9 +1311,13 @@ function QuestionnaireToolPart({
           }}
         >
           <div className="flex flex-col gap-1">
-            <p className="font-heading text-sm font-semibold">{part.input.title}</p>
+            <p className="font-heading text-sm font-semibold">
+              {part.input.title}
+            </p>
             {part.input.description ? (
-              <p className="text-xs text-muted-foreground">{part.input.description}</p>
+              <p className="text-xs text-muted-foreground">
+                {part.input.description}
+              </p>
             ) : null}
             <QuestionnaireProgress />
           </div>
