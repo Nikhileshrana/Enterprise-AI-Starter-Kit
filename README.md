@@ -199,6 +199,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 See [Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying) for details.
 
+## Author
+
+**Developed by [Nikhilesh Rana](https://github.com/Nikhileshrana)**
+
+Built to help developers ship enterprise-grade AI applications faster — without rebuilding auth, multi-tenancy, and agent infrastructure from scratch every time.
+
+- GitHub: [@Nikhileshrana](https://github.com/Nikhileshrana)
+- Repository: [Nikhileshrana/Starter-Kit](https://github.com/Nikhileshrana/Starter-Kit)
+
+Questions, feedback, and contributions are welcome. If this starter kit saves you time, consider starring the repo so more developers can find it.
+
 ## License
 
 Private — see repository owner for usage terms.
