@@ -50,7 +50,7 @@ export type PerplexitySearchResultItem = {
 };
 
 export type PerplexitySearchCardProps = {
-  query: string;
+  query?: string;
   results: PerplexitySearchResultItem[];
 };
 

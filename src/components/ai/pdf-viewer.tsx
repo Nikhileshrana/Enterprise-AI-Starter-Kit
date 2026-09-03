@@ -60,7 +60,9 @@ export function PdfViewer({ blob, generating, zoom = 1 }: PdfViewerProps) {
 
     return () => {
       cancelled = true;
+      const doc = pdfRef.current;
       pdfRef.current = null;
+      if (doc) void doc.cleanup();
     };
   }, [blob]);
 

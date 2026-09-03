@@ -136,7 +136,7 @@ export const createDocument = tool({
  * @see https://vercel.com/docs/ai-gateway/models-and-providers/web-search
  */
 export const perplexity_search = gateway.tools.perplexitySearch({
-  maxResults: 8,
+  maxResults: 5,
   searchLanguageFilter: ["en"],
 });
 

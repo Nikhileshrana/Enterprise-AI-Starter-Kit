@@ -510,7 +510,18 @@ export function AiChat({
                                 message.role === "user" && "items-end",
                               )}
                             >
-                              {message.parts.map((part, index) => (
+                              {message.parts.map((part, index) => {
+                                if (
+                                  part.type === "tool-perplexity_search" &&
+                                  index !==
+                                    message.parts.findLastIndex(
+                                      (item) =>
+                                        item.type === "tool-perplexity_search",
+                                    )
+                                ) {
+                                  return null;
+                                }
+                                return (
                                 <MessagePartView
                                   key={`${message.id}-${index}`}
                                   role={message.role}
@@ -527,7 +538,8 @@ export function AiChat({
                                   }
                                   onOpenArtifact={handleOpenArtifact}
                                 />
-                              ))}
+                                );
+                              })}
                             </div>
                           </MessageContent>
                         </Message>
@@ -1002,10 +1014,7 @@ function PerplexitySearchToolPart({
         return <ToolError text={output.message || "Search failed."} />;
       }
       return (
-        <SearchCard
-          query={formatSearchQuery(part.input?.query)}
-          results={output.results ?? []}
-        />
+        <SearchCard results={output.results ?? []} />
       );
     }
     case "output-error":

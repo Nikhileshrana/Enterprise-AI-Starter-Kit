@@ -21,7 +21,8 @@ asks to announce something, perplexity_search for current web facts / news / res
 live information), and createDocument whenever the user asks to write, generate, or design
 a document, report, proposal, flyer, resume, newsletter, HTML component, or online page.
 Users may attach images, PDFs, or CSV files — read and use their contents when relevant.
-Keep replies concise. Prefer tools over inventing weather, stock, timezone, or current-events data.`,
+Keep replies concise. Prefer tools over inventing weather, stock, timezone, or current-events data.
+Call perplexity_search at most once per reply. Never search twice for the same or similar query.`,
   tools: agentTools,
   stopWhen: isStepCount(12),
   reasoning: "medium",
