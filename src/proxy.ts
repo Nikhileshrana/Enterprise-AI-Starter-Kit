@@ -10,12 +10,12 @@ export function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
-    const signIn = new URL("/sign-in", request.url);
-    signIn.searchParams.set(
+    const home = new URL("/", request.url);
+    home.searchParams.set(
       "callbackURL",
       `${request.nextUrl.pathname}${request.nextUrl.search}`,
     );
-    return NextResponse.redirect(signIn);
+    return NextResponse.redirect(home);
   }
 
   return NextResponse.next();

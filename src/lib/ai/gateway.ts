@@ -1,4 +1,4 @@
-import { CHAT_MODELS, resolveChatModelId } from "@/lib/types";
+import { CHAT_MODELS, resolveChatModelId } from "@/lib/ai/models";
 
 /**
  * AI Gateway auth: AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN (via `vercel env pull`).

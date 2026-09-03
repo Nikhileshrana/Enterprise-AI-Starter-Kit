@@ -41,7 +41,7 @@ export function NavUser({ user, variant = "sidebar" }: NavUserProps) {
 
   async function handleLogout() {
     await signOut();
-    router.replace("/sign-in");
+    router.replace("/");
     router.refresh();
   }
 

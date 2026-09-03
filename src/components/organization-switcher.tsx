@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { toast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { authClient, getFreshSession, useSession } from "@/lib/auth/client";
+import { authClient, useSession } from "@/lib/auth/client";
 import type { Organization, OrganizationSwitcherProps } from "@/lib/types";
 import {
   AudioLinesIcon,
@@ -46,7 +46,7 @@ export function OrganizationSwitcher({
     setLoading(true);
     const [{ data: orgs, error }, freshSession] = await Promise.all([
       authClient.organization.list(),
-      getFreshSession(),
+      authClient.getSession(),
     ]);
 
     if (error) {

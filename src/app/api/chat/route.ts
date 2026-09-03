@@ -2,7 +2,7 @@ import { createAgentUIStreamResponse } from "ai";
 import { headers } from "next/headers";
 import { starterKitAgent } from "@/lib/ai/agent";
 import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
-import { resolveChatModelId } from "@/lib/types";
+import { resolveChatModelId } from "@/lib/ai/models";
 import { auth } from "@/lib/auth/server";
 import type { ChatRequestBody } from "@/lib/types";
 

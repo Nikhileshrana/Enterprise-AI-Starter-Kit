@@ -24,11 +24,14 @@ import {
 } from "lucide-react";
 import type {
   ChatHelpers,
-  ChatModelId,
   MessagePartViewProps,
   StarterKitUIMessage,
 } from "@/lib/types";
-import { CHAT_MODELS, resolveChatModelId } from "@/lib/types";
+import {
+  CHAT_MODELS,
+  resolveChatModelId,
+  type ChatModelId,
+} from "@/lib/ai/models";
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
 import {

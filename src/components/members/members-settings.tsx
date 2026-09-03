@@ -46,13 +46,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { authClient, useSession } from "@/lib/auth/client";
 import {
-  isAddMemberResult,
-  isOrganizationManager,
-  roleHas,
-  type AddMemberResponse,
-  type InvitationRow,
-  type MemberRow,
-  type MemberTableMeta,
+  canDeleteOrganization,
+  canManageMembers,
+  hasOwnerRole,
+} from "@/lib/auth/permissions";
+import type {
+  InvitationRow,
+  MemberRow,
+  MemberTableMeta,
+  OrganizationRole,
 } from "@/lib/types";
 
 const columnHelper = createDataTableColumnHelper<MemberRow>();
@@ -161,7 +163,7 @@ export function MembersSettings() {
   const [currentRole, setCurrentRole] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [email, setEmail] = React.useState("");
-  const [addRole, setAddRole] = React.useState("member");
+  const [inviteRole, setInviteRole] = React.useState<OrganizationRole>("member");
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
@@ -186,17 +188,6 @@ export function MembersSettings() {
       return;
     }
 
-    const pending = (fullOrg.data?.invitations ?? [])
-      .filter((invite) => invite.status === "pending")
-      .map(
-        (invite): InvitationRow => ({
-          id: invite.id,
-          email: invite.email,
-          role: invite.role,
-          status: invite.status,
-        }),
-      );
-
     setCurrentRole(activeMember.data?.role ?? null);
     setMembers(
       (listed.data?.members ?? []).map(
@@ -210,7 +201,18 @@ export function MembersSettings() {
         }),
       ),
     );
-    setInvitations(pending);
+    setInvitations(
+      (fullOrg.data?.invitations ?? [])
+        .filter((invite) => invite.status === "pending")
+        .map(
+          (invite): InvitationRow => ({
+            id: invite.id,
+            email: invite.email,
+            role: invite.role,
+            status: invite.status,
+          }),
+        ),
+    );
     setOrganizationId(fullOrg.data?.id ?? null);
     setOrganizationName(fullOrg.data?.name ?? "Organization");
     setLoading(false);
@@ -226,11 +228,12 @@ export function MembersSettings() {
     );
   }, [debouncedSearch, sorting]);
 
-  const canManage = isOrganizationManager(currentRole);
+  const canManage = canManageMembers(currentRole);
+  const canDelete = canDeleteOrganization(currentRole);
   const ownerCount = members.filter((member) =>
-    roleHas(member.role, "owner"),
+    hasOwnerRole(member.role),
   ).length;
-  const isSoleOwner = roleHas(currentRole, "owner") && ownerCount <= 1;
+  const isSoleOwner = hasOwnerRole(currentRole) && ownerCount <= 1;
 
   const filtered = React.useMemo(() => {
     const search = debouncedSearch.trim().toLowerCase();
@@ -261,32 +264,26 @@ export function MembersSettings() {
     pagination.pageIndex * pagination.pageSize + pagination.pageSize,
   );
 
-  async function addMember(event: React.FormEvent) {
+  async function inviteMember(event: React.FormEvent) {
     event.preventDefault();
     if (!email.trim() || !canManage) return;
-    setBusyId("add");
-    const response = await fetch("/api/organization/members", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), role: addRole }),
+    setBusyId("invite");
+    const { error } = await authClient.organization.inviteMember({
+      email: email.trim(),
+      role: inviteRole,
+      resend: true,
     });
     setBusyId(null);
-    const body = (await response.json().catch(() => null)) as AddMemberResponse | null;
-    if (!response.ok || !body || !isAddMemberResult(body)) {
+    if (error) {
       toast.add({
-        title: "Could not add member",
-        description:
-          body && "error" in body ? body.error : response.statusText,
+        title: "Could not invite member",
+        description: error.message,
       });
       return;
     }
     toast.add({
-      title: body.status === "invited" ? "Invitation sent" : "Member added",
-      description:
-        body.status === "invited"
-          ? `${email.trim()} can join after signing in with Google.`
-          : `${email.trim()} is now in the organization.`,
+      title: "Invitation created",
+      description: `${email.trim()} can join after signing in with Google.`,
     });
     setEmail("");
     await loadMembers();
@@ -359,7 +356,7 @@ export function MembersSettings() {
   }
 
   async function confirmDeleteOrganization() {
-    if (!organizationId || !canManage) return;
+    if (!organizationId || !canDelete) return;
     setBusyId("delete");
     const { error } = await authClient.organization.delete({ organizationId });
     setBusyId(null);
@@ -385,14 +382,14 @@ export function MembersSettings() {
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle>Add member</CardTitle>
+            <CardTitle>Invite member</CardTitle>
             <CardDescription>
-              Existing accounts join immediately. New emails get a pending
-              invitation until they sign in with Google.
+              Creates a Better Auth invitation. They join after signing in with
+              Google (same email).
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={(event) => void addMember(event)}>
+            <form onSubmit={(event) => void inviteMember(event)}>
               <FieldGroup className="gap-4 md:flex-row md:items-end">
                 <Field className="flex-1">
                   <FieldLabel htmlFor="member-email">Email</FieldLabel>
@@ -403,15 +400,17 @@ export function MembersSettings() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="colleague@company.com"
-                    disabled={busyId === "add"}
+                    disabled={busyId === "invite"}
                   />
                 </Field>
                 <Field className="w-full md:w-40">
                   <FieldLabel>Role</FieldLabel>
                   <Select
-                    value={addRole}
+                    value={inviteRole}
                     onValueChange={(value) => {
-                      if (value) setAddRole(value);
+                      if (value === "member" || value === "admin" || value === "owner") {
+                        setInviteRole(value);
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -426,11 +425,11 @@ export function MembersSettings() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Button type="submit" disabled={busyId === "add"}>
-                  {busyId === "add" ? (
+                <Button type="submit" disabled={busyId === "invite"}>
+                  {busyId === "invite" ? (
                     <Spinner data-icon="inline-start" />
                   ) : null}
-                  Add
+                  Invite
                 </Button>
               </FieldGroup>
             </form>
@@ -525,7 +524,7 @@ export function MembersSettings() {
         <CardHeader>
           <CardTitle>Organization</CardTitle>
           <CardDescription>
-            Leave this organization, or delete it if you manage it.
+            Leave this organization, or delete it if you are an owner.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -547,7 +546,7 @@ export function MembersSettings() {
               else an owner before leaving.
             </p>
           )}
-          {canManage ? (
+          {canDelete ? (
             <Button
               type="button"
               variant="destructive"

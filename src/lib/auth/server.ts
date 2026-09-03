@@ -1,19 +1,18 @@
 import { betterAuth } from "better-auth/minimal";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
-import { bearer, organization } from "better-auth/plugins";
+import { organization } from "better-auth/plugins/organization";
 import { waitUntil } from "@vercel/functions";
 import client, { db } from "@/lib/db/mongodb";
 
 /**
- * Better Auth + organization plugin.
- * Creator is always `owner` (`creatorRole`).
+ * Better Auth (MongoDB) + organization plugin.
+ * Cookie sessions only (Next.js). Creator role is `owner`.
  * @see https://www.better-auth.com/docs/plugins/organization
+ * @see https://www.better-auth.com/docs/integrations/next
  */
 export const auth = betterAuth({
-  database: mongodbAdapter(db, {
-    client,
-  }),
+  database: mongodbAdapter(db, { client }),
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -21,6 +20,8 @@ export const auth = betterAuth({
     },
   },
   session: {
+    // Cookie cache reduces DB session reads. For multi-region / 10M+ sessions,
+    // add secondaryStorage (Redis) — see Better Auth session docs.
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60,
@@ -41,15 +42,14 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    bearer(),
     organization({
       creatorRole: "owner",
       allowUserToCreateOrganization: true,
-      // Pending invites live in Better Auth's `invitation` collection (no custom table).
       invitationExpiresIn: 60 * 60 * 24 * 7,
       cancelPendingInvitationsOnReInvite: true,
+      // Invitation emails optional — pending invites work via listUserInvitations + accept.
     }),
+    // Must be last so Set-Cookie is applied in Next.js route handlers.
     nextCookies(),
   ],
 });
-

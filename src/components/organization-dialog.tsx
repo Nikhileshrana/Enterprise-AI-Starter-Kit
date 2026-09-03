@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
-import { authClient, getFreshSession } from "@/lib/auth/client";
+import { authClient } from "@/lib/auth/client";
 import type {
   Organization,
   OrganizationDialogProps,
@@ -163,7 +163,7 @@ export function OrganizationGate({ userId }: OrganizationGateProps) {
 
       const [{ data: orgs, error }, session] = await Promise.all([
         authClient.organization.list(),
-        getFreshSession(),
+        authClient.getSession(),
       ]);
 
       if (cancelled) return;

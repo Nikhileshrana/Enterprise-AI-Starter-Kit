@@ -6,10 +6,7 @@ import { auth } from "@/lib/auth/server";
 import type { CurrentUser, Session } from "@/lib/types";
 
 /**
- * Request-time session read for Cache Components.
- * Uses `use cache: private` so cookies/headers are allowed and the result
- * stays in the browser cache (never a shared server cache).
- *
+ * Request-time session for Cache Components (`use cache: private`).
  * @see https://nextjs.org/docs/app/guides/authentication-with-cache-components
  */
 export async function getCurrentSession(): Promise<Session | null> {
@@ -18,14 +15,10 @@ export async function getCurrentSession(): Promise<Session | null> {
 
   return auth.api.getSession({
     headers: await headers(),
-    query: { disableCookieCache: true },
   });
 }
 
-/**
- * Narrow user for Server Components — avoids exposing full session to clients.
- * Keep calls behind `<Suspense>` when used in pages (Cache Components rule).
- */
+/** Narrow user for Server Components — keep behind `<Suspense>`. */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await getCurrentSession();
   if (!session) return null;
