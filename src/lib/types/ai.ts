@@ -19,6 +19,7 @@ export type ChatHelpers = {
 export type MessagePartViewProps = ChatHelpers & {
   role: StarterKitUIMessage["role"];
   part: StarterKitUIMessage["parts"][number];
+  isStreaming?: boolean;
   onOpenArtifact?: (artifact: {
     id: string;
     title: string;

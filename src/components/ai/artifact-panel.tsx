@@ -10,11 +10,10 @@ import {
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { renderHtmlToPdfBlob } from "@/lib/export-utils";
+import { buildArtifactDocument, renderHtmlToPdfBlob } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { PdfViewer } from "@/components/ai/pdf-viewer";
 
 export interface ArtifactData {
   id: string;
@@ -37,32 +36,10 @@ export function ArtifactPanel({
   const isMobile = useIsMobile();
   const [tab, setTab] = React.useState<"preview" | "code">("preview");
   const [expanded, setExpanded] = React.useState(false);
-  const [generating, setGenerating] = React.useState(false);
-  const [pdfBlob, setPdfBlob] = React.useState<Blob | null>(null);
   const [downloading, setDownloading] = React.useState(false);
 
   React.useEffect(() => {
-    if (!open || !artifact) return;
-    setTab("preview");
-    setGenerating(true);
-    setPdfBlob(null);
-
-    let cancelled = false;
-
-    renderHtmlToPdfBlob(artifact.content)
-      .then((blob) => {
-        if (!cancelled) setPdfBlob(blob);
-      })
-      .catch((err) => {
-        if (!cancelled) toast.add({ title: "Failed to render PDF", description: String(err) });
-      })
-      .finally(() => {
-        if (!cancelled) setGenerating(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    if (open) setTab("preview");
   }, [open, artifact]);
 
   const slugTitle = artifact
@@ -114,12 +91,7 @@ export function ArtifactPanel({
                 expanded={expanded}
                 onClose={() => onOpenChange(false)}
               />
-              <PanelBody
-                tab={tab}
-                artifact={artifact}
-                pdfBlob={pdfBlob}
-                generating={generating}
-              />
+              <PanelBody tab={tab} artifact={artifact} />
             </div>
           </motion.div>
         ) : null}
@@ -148,12 +120,7 @@ export function ArtifactPanel({
               expanded={expanded}
               onClose={() => onOpenChange(false)}
             />
-            <PanelBody
-              tab={tab}
-              artifact={artifact}
-              pdfBlob={pdfBlob}
-              generating={generating}
-            />
+            <PanelBody tab={tab} artifact={artifact} />
           </div>
         </motion.aside>
       ) : null}
@@ -255,13 +222,9 @@ function PanelHeader({
 function PanelBody({
   tab,
   artifact,
-  pdfBlob,
-  generating,
 }: {
   tab: "preview" | "code";
   artifact: ArtifactData;
-  pdfBlob: Blob | null;
-  generating: boolean;
 }) {
   if (tab === "code") {
     return (
@@ -273,9 +236,17 @@ function PanelBody({
     );
   }
 
+  const srcDoc = buildArtifactDocument(artifact.title, artifact.content);
+
   return (
-    <div className="relative flex-1 min-h-0 bg-[#27272a]">
-      <PdfViewer blob={pdfBlob} generating={generating} />
+    <div className="relative flex-1 min-h-0 bg-[#3f3f46]">
+      <iframe
+        key={artifact.id}
+        srcDoc={srcDoc}
+        title={artifact.title || "Document preview"}
+        sandbox="allow-same-origin allow-scripts"
+        className="h-full w-full border-0 bg-[#3f3f46]"
+      />
     </div>
   );
 }

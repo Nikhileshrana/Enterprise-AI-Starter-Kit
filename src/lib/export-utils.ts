@@ -108,6 +108,110 @@ export async function exportToPng(
   }
 }
 
+const DOCUMENT_TYPE_CSS = `
+  * { box-sizing: border-box; }
+  h1, h2, h3, h4 {
+    margin: 0 0 0.45em;
+    color: #111827;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+  h1, .doc-title { font-size: 22px; }
+  h2 { font-size: 15px; }
+  h3 { font-size: 13px; }
+  p { margin: 0 0 0.85em; }
+  .doc-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin-bottom: 14px;
+  }
+  .doc-title { margin: 0 0 8px; }
+  .doc-intro { color: #6b7280; font-size: 12.5px; line-height: 1.6; margin-bottom: 22px; }
+  .section-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    border-bottom: 1px solid #111827;
+    padding-bottom: 4px;
+    margin: 28px 0 14px;
+  }
+  .doc-grid, .doc-block { display: block; margin: 0 0 22px; }
+  .doc-grid-left { margin-bottom: 8px; }
+  .doc-grid-right { margin: 0; }
+  .sub-heading { font-size: 14px; font-weight: 700; color: #111827; margin: 0 0 6px; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    padding: 0 10px;
+    margin: 0 6px 0 0;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4b5563;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    line-height: 20px;
+    vertical-align: middle;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 16px;
+    font-size: 11.5px;
+  }
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.4;
+  }
+  th {
+    background: #111827;
+    color: #ffffff;
+    font-weight: 600;
+    border-color: #111827;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+  td:first-child { font-weight: 600; color: #111827; }
+  ul, ol { margin: 0 0 12px; padding: 0 0 0 1.15rem; }
+  ul { list-style: none; }
+  ul li {
+    position: relative;
+    margin: 0 0 6px;
+    padding-left: 0.2rem;
+    line-height: 1.5;
+  }
+  ul li::before {
+    content: "•";
+    position: absolute;
+    left: -0.95rem;
+    top: 0;
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  ol { padding-left: 1.35rem; }
+  li > strong { font-weight: 700; color: #111827; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+  pre { background: #111827; color: #f9fafb; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 11px; }
+  blockquote { border-left: 3px solid #d1d5db; margin: 0 0 12px; padding-left: 12px; color: #6b7280; }
+  a { color: #2563eb; }
+  img { max-width: 100%; height: auto; }
+  strong { font-weight: 650; color: #111827; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+`;
+
 /** Build a standalone HTML document string with safe (non-oklch) CSS for iframe rendering */
 export function buildArtifactDocument(title: string, content: string): string {
   return `<!DOCTYPE html>
@@ -117,220 +221,86 @@ export function buildArtifactDocument(title: string, content: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${title}</title>
 <style>
-  * { box-sizing: border-box; }
-  html { font-size: 12px; }
+  ${DOCUMENT_TYPE_CSS}
+  html { font-size: 13px; }
   body {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.55;
-    color: #3f3f46;
-    background: #27272a;
-    padding: 24px 16px 48px;
+    color: #1f2937;
+    background: #3f3f46;
     margin: 0;
+    padding: 20px 12px 40px;
     -webkit-font-smoothing: antialiased;
   }
   .page {
-    width: 794px;
-    max-width: 100%;
-    height: 1123px;
+    width: min(794px, 100%);
+    min-height: 1123px;
     margin: 0 auto 20px;
     background: #ffffff;
-    padding: 56px 64px;
+    padding: 52px 56px 64px;
     border-radius: 2px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.18);
-    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28);
     position: relative;
   }
-
-  /* Per-page badge */
   .page-badge {
     position: absolute;
-    bottom: 16px;
-    right: 16px;
-    z-index: 10;
+    bottom: 18px;
+    right: 18px;
     background: rgba(39,39,42,0.92);
-    color: #ffffff;
-    font-size: 0.68rem;
+    color: #fff;
+    font-size: 11px;
     font-weight: 500;
-    padding: 5px 12px;
+    padding: 5px 11px;
     border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.12);
     pointer-events: none;
-    user-select: none;
   }
-
-  /* Top meta row: REPORT label + date */
-  .doc-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 0.7rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #a1a1aa;
-    margin-bottom: 1.2em;
-  }
-
-  /* Main title */
-  .doc-title {
-    font-size: 1.85rem;
-    font-weight: 700;
-    color: #0a0a0a;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    margin: 0 0 0.6em 0;
-  }
-
-  /* Intro paragraph */
-  .doc-intro {
-    color: #71717a;
-    font-size: 0.92rem;
-    line-height: 1.6;
-    margin-bottom: 2.5em;
-    max-width: 95%;
-  }
-
-  /* Section header with underline */
-  .section-title {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #0a0a0a;
-    display: inline-block;
-    border-bottom: 1px solid #0a0a0a;
-    padding-bottom: 2px;
-    margin: 2.5em 0 1.2em 0;
-  }
-
-  /* Two-column layout for sub-sections */
-  .doc-grid {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 2.5em;
-    margin-bottom: 2em;
-  }
-
-  /* Left column: sub-heading + badges */
-  .doc-grid-left { padding-top: 0.2em; }
-  .sub-heading {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #0a0a0a;
-    margin-bottom: 0.6em;
-  }
-  .badge {
-    display: inline-block;
-    box-sizing: border-box;
-    height: 22px;
-    line-height: 22px;
-    padding: 0 11px;
-    margin: 0 6px 6px 0;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #3f3f46;
-    border: 1px solid #c4c4c8;
-    border-radius: 11px;
-    vertical-align: middle;
-    white-space: nowrap;
-  }
-
-  /* Right column: body content */
-  .doc-grid-right p { margin-bottom: 0.7em; }
-  .doc-grid-right p:first-child strong { color: #0a0a0a; }
-
-  /* Standard elements */
-  h1, h2, h3, h4 { margin-top: 1.4em; margin-bottom: 0.5em; color: #0a0a0a; font-weight: 700; line-height: 1.3; }
-  h1 { font-size: 1.85em; letter-spacing: -0.02em; }
-  h2 { font-size: 1.3em; }
-  h3 { font-size: 1.1em; }
-  p { margin-bottom: 0.8em; }
-  table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.88em; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; }
-  th { background: #1e293b; color: #ffffff; font-weight: 600; padding: 10px 14px; text-align: left; border: none; font-size: 0.92em; letter-spacing: 0.01em; }
-  td { padding: 10px 14px; text-align: left; border: none; border-bottom: 1px solid #e2e8f0; vertical-align: middle; line-height: 1.45; }
-  tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) td { background: #f8fafc; }
-  tbody tr:hover td { background: #f1f5f9; }
-  td:first-child { font-weight: 600; color: #0f172a; }
-  ul { list-style-type: disc; list-style-position: outside; padding-left: 1.5em; margin-bottom: 0.8em; }
-  ol { list-style-type: decimal; list-style-position: outside; padding-left: 1.8em; margin-bottom: 0.8em; }
-  li { margin-bottom: 0.4em; line-height: 1.5; }
-  li > strong { font-weight: 700; }
-  code { background: #f4f4f5; padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, "SF Mono", monospace; font-size: 0.85em; }
-  pre { background: #18181b; color: #f4f4f5; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.82em; }
-  blockquote { border-left: 3px solid #d4d4d8; margin: 0 0 0.8em 0; padding-left: 14px; color: #71717a; }
-  a { color: #2563eb; text-decoration: underline; }
-  img { max-width: 100%; height: auto; }
-  strong { font-weight: 600; color: #0a0a0a; }
-  hr { border: none; border-top: 1px solid #e4e4e7; margin: 1.8em 0; }
 </style>
 </head>
 <body>
 <div id="pages"></div>
-<div id="measure" style="position:absolute;left:-9999px;top:0;width:666px;padding:0;margin:0;visibility:hidden;">
+<div id="measure" style="position:absolute;left:-9999px;top:0;width:682px;visibility:hidden;">
 ${content}
 </div>
 <script>
   (function() {
     var measure = document.getElementById('measure');
     var pagesContainer = document.getElementById('pages');
-    var pageContentHeight = 1011; // 1123 - 56*2 padding
+    var pageContentHeight = 1000;
+    var children = Array.prototype.slice.call(measure.children);
+    var buckets = [[]];
+    var height = 0;
 
-    function createPage(num, total) {
+    function elHeight(el) {
+      var style = window.getComputedStyle(el);
+      var mt = parseFloat(style.marginTop) || 0;
+      var mb = parseFloat(style.marginBottom) || 0;
+      return el.offsetHeight + mt + mb;
+    }
+
+    children.forEach(function(child) {
+      var h = elHeight(child);
+      var last = buckets[buckets.length - 1];
+      if (last.length && height + h > pageContentHeight) {
+        buckets.push([]);
+        height = 0;
+        last = buckets[buckets.length - 1];
+      }
+      last.push(child);
+      height += h;
+    });
+
+    if (!buckets[0].length) buckets[0].push(measure);
+    var total = buckets.length;
+    buckets.forEach(function(nodes, i) {
       var page = document.createElement('div');
       page.className = 'page';
+      nodes.forEach(function(n) { page.appendChild(n); });
       var badge = document.createElement('div');
       badge.className = 'page-badge';
-      badge.textContent = 'Page ' + num + ' / ' + total;
+      badge.textContent = 'Page ' + (i + 1) + ' / ' + total;
       page.appendChild(badge);
-      return page;
-    }
-
-    function paginate() {
-      var children = Array.prototype.slice.call(measure.childNodes);
-      var pages = [];
-      var current = null;
-      var currentHeight = 0;
-
-      function newPage() {
-        current = document.createElement('div');
-        current.style.padding = '0';
-        current.style.margin = '0';
-        currentHeight = 0;
-        pages.push(current);
-      }
-
-      newPage();
-
-      for (var i = 0; i < children.length; i++) {
-        var child = children[i];
-        if (child.nodeType === 3) {
-          if (!child.textContent.trim()) continue;
-          var span = document.createElement('span');
-          span.style.display = 'block';
-          span.textContent = child.textContent;
-          child = span;
-        }
-        var h = child.offsetHeight || 0;
-        if (h === 0) continue;
-
-        if (currentHeight + h > pageContentHeight && currentHeight > 0) {
-          newPage();
-        }
-        current.appendChild(child);
-        currentHeight += h;
-      }
-
-      var total = pages.length;
-      for (var p = 0; p < total; p++) {
-        var page = createPage(p + 1, total);
-        var content = pages[p];
-        // Insert content before badge
-        page.insertBefore(content, page.firstChild);
-        pagesContainer.appendChild(page);
-      }
-    }
-
-    paginate();
+      pagesContainer.appendChild(page);
+    });
     measure.remove();
   })();
 </script>
@@ -338,60 +308,39 @@ ${content}
 </html>`;
 }
 
-/** Build a simple isolated HTML document for PDF rendering (no scripts, safe CSS only) */
 function buildPdfDocument(content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
-  * { box-sizing: border-box; }
+  ${DOCUMENT_TYPE_CSS}
+  html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.55;
-    color: #18181b;
+    color: #1f2937;
     background: #ffffff;
-    padding: 56px 64px;
-    margin: 0;
     font-size: 13px;
   }
-  h1,h2,h3,h4 { margin-top: 1.4em; margin-bottom: 0.5em; color: #0a0a0a; font-weight: 700; line-height: 1.3; }
-  h1 { font-size: 1.85em; letter-spacing: -0.02em; }
-  h2 { font-size: 1.3em; }
-  h3 { font-size: 1.1em; }
-  p { margin-bottom: 0.8em; }
-  table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.88em; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; }
-  th { background: #1e293b; color: #ffffff; font-weight: 600; padding: 10px 14px; text-align: left; border: none; font-size: 0.92em; letter-spacing: 0.01em; }
-  td { padding: 10px 14px; text-align: left; border: none; border-bottom: 1px solid #e2e8f0; vertical-align: middle; line-height: 1.45; }
-  tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) td { background: #f8fafc; }
-  tbody tr:hover td { background: #f1f5f9; }
-  td:first-child { font-weight: 600; color: #0f172a; }
-  ul { list-style-type: disc; list-style-position: outside; padding-left: 1.5em; margin-bottom: 0.8em; }
-  ol { list-style-type: decimal; list-style-position: outside; padding-left: 1.8em; margin-bottom: 0.8em; }
-  li { margin-bottom: 0.4em; line-height: 1.5; }
-  li > strong { font-weight: 700; }
-  code { background: #f4f4f5; padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 0.85em; }
-  pre { background: #18181b; color: #f4f4f5; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 0.82em; }
-  blockquote { border-left: 3px solid #d4d4d8; margin: 0 0 0.8em 0; padding-left: 14px; color: #71717a; }
-  a { color: #2563eb; text-decoration: underline; }
-  img { max-width: 100%; height: auto; }
-  strong { font-weight: 600; color: #0a0a0a; }
-  hr { border: none; border-top: 1px solid #e4e4e7; margin: 1.8em 0; }
-  .doc-meta { display: flex; justify-content: space-between; font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #a1a1aa; margin-bottom: 1.2em; }
-  .doc-title { font-size: 1.85rem; font-weight: 700; color: #0a0a0a; letter-spacing: -0.02em; margin: 0 0 0.6em 0; }
-  .doc-intro { color: #71717a; font-size: 0.92rem; margin-bottom: 2.5em; }
-  .section-title { font-size: 1.05rem; font-weight: 700; color: #0a0a0a; display: inline-block; border-bottom: 1px solid #0a0a0a; padding-bottom: 2px; margin: 2.5em 0 1.2em 0; }
-  .doc-grid { display: grid; grid-template-columns: 200px 1fr; gap: 2.5em; margin-bottom: 2em; }
-  .sub-heading { font-size: 0.95rem; font-weight: 700; color: #0a0a0a; margin-bottom: 0.6em; }
-  .badge { display: inline-block; box-sizing: border-box; height: 22px; line-height: 22px; padding: 0 11px; margin: 0 6px 6px 0; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #3f3f46; border: 1px solid #c4c4c8; border-radius: 11px; vertical-align: middle; white-space: nowrap; }
+  .print-page {
+    width: 794px;
+    height: 1123px;
+    padding: 52px 56px 64px;
+    background: #ffffff;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
 </style>
 </head>
 <body>
-${content}
+<div id="source">${content}</div>
 </body>
 </html>`;
 }
+
+const A4_WIDTH_PX = 794;
+const A4_HEIGHT_PX = 1123;
 
 /** Render HTML string into a paginated A4 PDF Blob using an isolated iframe */
 export async function renderHtmlToPdfBlob(html: string): Promise<Blob> {
@@ -399,8 +348,8 @@ export async function renderHtmlToPdfBlob(html: string): Promise<Blob> {
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
   iframe.style.top = "0";
-  iframe.style.width = "794px";
-  iframe.style.height = "1200px";
+  iframe.style.width = `${A4_WIDTH_PX}px`;
+  iframe.style.height = `${A4_HEIGHT_PX}px`;
   iframe.style.border = "0";
   iframe.srcdoc = buildPdfDocument(html);
   document.body.appendChild(iframe);
@@ -413,105 +362,70 @@ export async function renderHtmlToPdfBlob(html: string): Promise<Blob> {
     });
 
     const iframeDoc = iframe.contentDocument;
-    if (!iframeDoc || !iframe.contentWindow) {
-      throw new Error("Cannot access iframe document");
-    }
+    if (!iframeDoc) throw new Error("Cannot access iframe document");
 
-    const target = iframeDoc.body;
+    const source = iframeDoc.getElementById("source");
+    if (!source) throw new Error("Missing source");
 
-    // Element-boundary pagination: group child elements into A4 pages
-    const pageContentHeight = 1011; // 1123px A4 - 56*2 padding
-    const children = Array.from(target.childNodes);
+    const pageContentHeight = 1000;
+    const children = Array.from(source.children);
+    const buckets: Element[][] = [[]];
+    let height = 0;
 
-    // Group elements into pages
-    const pages: Node[][] = [];
-    let currentPage: Node[] = [];
-    let currentHeight = 0;
+    const elHeight = (el: Element) => {
+      const htmlEl = el as HTMLElement;
+      const style = iframeDoc.defaultView?.getComputedStyle(htmlEl);
+      const mt = parseFloat(style?.marginTop || "0") || 0;
+      const mb = parseFloat(style?.marginBottom || "0") || 0;
+      return htmlEl.offsetHeight + mt + mb;
+    };
 
     for (const child of children) {
-      // Skip empty text nodes
-      if (child.nodeType === 3) {
-        if (!child.textContent?.trim()) continue;
-        // Wrap text nodes in a span
-        const span = iframeDoc.createElement("span");
-        span.style.display = "block";
-        span.textContent = child.textContent;
-        child.parentNode?.replaceChild(span, child);
-        currentPage.push(span);
-        currentHeight += span.offsetHeight || 0;
-        continue;
+      const h = elHeight(child);
+      const last = buckets[buckets.length - 1]!;
+      if (last.length && height + h > pageContentHeight) {
+        buckets.push([]);
+        height = 0;
       }
-
-      if (child.nodeType !== 1) continue;
-      const el = child as HTMLElement;
-      const elHeight = el.offsetHeight || 0;
-      if (elHeight === 0) continue;
-
-      // If element alone is taller than a page, put it on its own page
-      if (elHeight > pageContentHeight && currentPage.length > 0) {
-        pages.push(currentPage);
-        currentPage = [];
-        currentHeight = 0;
-      }
-
-      // If adding this element exceeds page height, start new page
-      if (currentHeight + elHeight > pageContentHeight && currentPage.length > 0) {
-        pages.push(currentPage);
-        currentPage = [];
-        currentHeight = 0;
-      }
-
-      currentPage.push(child);
-      currentHeight += elHeight;
+      buckets[buckets.length - 1]!.push(child);
+      height += h;
     }
 
-    if (currentPage.length > 0) {
-      pages.push(currentPage);
+    if (!buckets[0]?.length) {
+      buckets[0] = [source];
     }
 
-    // Fallback: if no pages (empty content), render whole body
-    if (pages.length === 0) {
-      pages.push(Array.from(target.childNodes));
-    }
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidthMm = pdf.internal.pageSize.getWidth();
     const pageHeightMm = pdf.internal.pageSize.getHeight();
 
-    for (let p = 0; p < pages.length; p++) {
-      // Create a temporary container for this page's elements
+    for (let p = 0; p < buckets.length; p++) {
       const pageDiv = iframeDoc.createElement("div");
-      pageDiv.style.cssText =
-        "padding:56px 64px;background:#ffffff;width:794px;box-sizing:border-box;";
-      for (const node of pages[p]) {
-        if (node.nodeType === 1) {
-          pageDiv.appendChild(node.cloneNode(true));
-        }
+      pageDiv.className = "print-page";
+      for (const node of buckets[p]!) {
+        pageDiv.appendChild(node.cloneNode(true));
       }
-      target.appendChild(pageDiv);
+      iframeDoc.body.appendChild(pageDiv);
 
       const canvas = await html2canvas(pageDiv, {
-        scale: 4,
+        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
-        ...({ letterRendering: true } as Record<string, unknown>),
-        windowWidth: 794,
-        windowHeight: pageDiv.offsetHeight,
+        width: A4_WIDTH_PX,
+        height: A4_HEIGHT_PX,
+        windowWidth: A4_WIDTH_PX,
+        windowHeight: A4_HEIGHT_PX,
       });
 
       pageDiv.remove();
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
       if (p > 0) pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, 0, pageWidthMm, pageHeightMm);
+      pdf.addImage(imgData, "JPEG", 0, 0, pageWidthMm, pageHeightMm);
     }
 
+    source.remove();
     return pdf.output("blob");
   } finally {
     iframe.remove();

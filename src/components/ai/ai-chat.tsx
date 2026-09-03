@@ -39,6 +39,7 @@ import {
 import { WeatherCard } from "@/components/ai/weather-card";
 import { StockCard } from "@/components/ai/stock-card";
 import { SearchCard } from "@/components/ai/search-card";
+import { MarkdownMessage } from "@/components/ai/markdown-message";
 import {
   Attachment,
   AttachmentContent,
@@ -513,6 +514,12 @@ export function AiChat({
                                   addToolApprovalResponse={
                                     addToolApprovalResponse
                                   }
+                                  isStreaming={
+                                    status === "streaming" &&
+                                    message.role === "assistant" &&
+                                    message.id ===
+                                      messages[messages.length - 1]?.id
+                                  }
                                   onOpenArtifact={handleOpenArtifact}
                                 />
                               ))}
@@ -868,14 +875,17 @@ function MessagePartView({
   addToolOutput,
   addToolApprovalResponse,
   onOpenArtifact,
+  isStreaming = false,
 }: MessagePartViewProps) {
   if (isTextUIPart(part)) {
     if (!part.text) return null;
     const align = role === "user" ? "end" : "start";
     return (
       <Bubble variant={role === "user" ? "default" : "muted"} align={align}>
-        <BubbleContent className="whitespace-pre-wrap">
-          {part.text}
+        <BubbleContent>
+          <MarkdownMessage isAnimating={isStreaming && role === "assistant"}>
+            {part.text}
+          </MarkdownMessage>
         </BubbleContent>
       </Bubble>
     );
