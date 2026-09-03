@@ -45,7 +45,7 @@ async function ProtectedLayoutContent({
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 overflow-hidden">
         <MobileTopBar user={user} />
-        <ScrollArea className="flex min-h-svh flex-1 flex-col">
+        <ScrollArea className="flex min-h-0 flex-1 flex-col">
           {children}
         </ScrollArea>
         <MobileBottomNav />
