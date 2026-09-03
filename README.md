@@ -10,6 +10,12 @@ Ship faster with auth, RBAC, streaming chat, tool-calling agents, and a polished
 ![Better Auth](https://img.shields.io/badge/Better_Auth-1.7-000)
 ![AI SDK](https://img.shields.io/badge/AI_SDK-v7-000)
 
+## Overview
+
+Landing page with Google sign-in and a full module overview — everything included in the kit at a glance.
+
+![Landing page with sign-in and module overview](public/repository/main.png)
+
 ## What's included
 
 ### Application core
@@ -40,6 +46,18 @@ Ship faster with auth, RBAC, streaming chat, tool-calling agents, and a polished
 | **Invitations** | Invite teammates to an organization |
 | **Member settings** | Sortable data table, role updates, org deletion |
 
+Create a workspace on first sign-in. New users are prompted to name their organization before entering the app.
+
+![Create organization dialog](public/repository/createOrganization.png)
+
+Switch between organizations from the sidebar. Create additional workspaces without leaving the dashboard.
+
+![Organization switcher](public/repository/manageOrganization.png)
+
+Invite members by email, assign roles, search and paginate the member table, and manage org lifecycle (leave / delete).
+
+![Member settings — invite, roles, and organization management](public/repository/inviteMembers.png)
+
 ### Data & storage
 
 | Module | Purpose |
@@ -57,6 +75,10 @@ Ship faster with auth, RBAC, streaming chat, tool-calling agents, and a polished
 | **Tool-loop agent** | Multi-step agent with 12-step cap and reasoning |
 | **Chat UI** | Attachments, model picker, history, artifact panel |
 
+Streaming chat with tool calls, file attachments, model picker, and chat history — powered by the tool-loop agent and Vercel AI Gateway.
+
+![AI chat with tools, attachments, and web search](public/repository/toolsUsage.png)
+
 ### AI capabilities
 
 | Module | Purpose |
@@ -67,6 +89,10 @@ Ship faster with auth, RBAC, streaming chat, tool-calling agents, and a polished
 | **Document artifacts** | HTML reports, proposals, and code artifacts |
 | **File attachments** | JPEG, PNG, GIF, WebP, PDF, CSV in chat |
 | **Export** | PDF and PNG export for generated artifacts |
+
+Generated documents open in a side artifact panel with live PDF preview, zoom, and export — built from image + web search + `createDocument` tool output.
+
+![Artifact panel with PDF preview and export](public/repository/artifactUsage.png)
 
 ### UI system
 
