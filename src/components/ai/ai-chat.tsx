@@ -1,45 +1,38 @@
 "use client";
 
-import * as React from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-  lastAssistantMessageIsCompleteWithToolCalls,
+  type FileUIPart,
   isFileUIPart,
   isReasoningUIPart,
   isTextUIPart,
-  type FileUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
 import {
   ArrowUpIcon,
   BrainIcon,
+  ChevronDownIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
   ImageIcon,
-  MessageSquareIcon,
-  MessageSquarePlusIcon,
+  MicIcon,
   PlusIcon,
-  RotateCcwIcon,
   SparklesIcon,
   SquareIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import type {
-  ChatHelpers,
-  MessagePartViewProps,
-  StarterKitUIMessage,
-} from "@/lib/types";
+import * as React from "react";
 import {
-  CHAT_MODELS,
-  resolveChatModelId,
-  type ChatModelId,
-} from "@/lib/ai/models";
-import { WeatherCard } from "@/components/ai/weather-card";
-import { StockCard } from "@/components/ai/stock-card";
-import { SearchCard } from "@/components/ai/search-card";
+  type ArtifactData,
+  ArtifactPanel,
+} from "@/components/ai/artifact-panel";
 import { MarkdownMessage } from "@/components/ai/markdown-message";
+import { SearchCard } from "@/components/ai/search-card";
+import { StockCard } from "@/components/ai/stock-card";
+import { WeatherCard } from "@/components/ai/weather-card";
 import {
   Attachment,
   AttachmentContent,
@@ -55,12 +48,27 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import {
   Message,
@@ -94,22 +102,22 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import {
-  ArtifactPanel,
-  type ArtifactData,
-} from "@/components/ai/artifact-panel";
+  CHAT_MODELS,
+  type ChatModelId,
+  getChatModel,
+  resolveChatModelId,
+} from "@/lib/ai/models";
 import type { ChatConversationMeta } from "@/lib/db/chat";
+import type {
+  ChatHelpers,
+  MessagePartViewProps,
+  StarterKitUIMessage,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SUPPORTED_IMAGE_TYPES = new Set([
@@ -577,7 +585,7 @@ export function AiChat({
 
           <form
             onSubmit={(event) => void onSubmit(event)}
-            className="shrink-0 px-1 pb-1"
+            className="flex shrink-0 flex-col gap-2 px-1 pb-1"
           >
             <input
               ref={fileInputRef}
@@ -592,26 +600,37 @@ export function AiChat({
               }}
             />
 
-            <div className="rounded-2xl border border-border bg-muted/40 shadow-xs transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
-              {pendingFiles.length > 0 ? (
-                <div className="flex flex-wrap gap-2 px-3 pt-3">
-                  {pendingFiles.map((file, index) => (
-                    <PendingFileAttachment
-                      key={`${file.name}-${file.size}-${index}`}
-                      file={file}
-                      onRemove={() => removePendingFile(index)}
-                    />
-                  ))}
-                </div>
-              ) : null}
+            {pendingFiles.length > 0 ? (
+              <div className="flex flex-wrap gap-2 px-1">
+                {pendingFiles.map((file, index) => (
+                  <PendingFileAttachment
+                    key={`${file.name}-${file.size}-${index}`}
+                    file={file}
+                    onRemove={() => removePendingFile(index)}
+                  />
+                ))}
+              </div>
+            ) : null}
 
-              <Textarea
+            <InputGroup className="h-auto min-h-12 items-center rounded-full border-border bg-muted/40 py-1 shadow-none has-[textarea]:rounded-full has-[[data-slot=input-group-control]:focus-visible]:border-border has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+              <InputGroupAddon align="inline-start" className="ps-2.5">
+                <InputGroupButton
+                  size="icon-sm"
+                  aria-label="Attach files"
+                  disabled={busy}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <PlusIcon />
+                </InputGroupButton>
+              </InputGroupAddon>
+
+              <InputGroupTextarea
                 ref={inputRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="How can I help you today?"
-                rows={2}
-                className="min-h-20 max-h-40 overflow-y-auto border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                placeholder="Write a message..."
+                rows={1}
+                className="min-h-10 max-h-40 py-2.5 text-sm leading-relaxed"
                 onPaste={(event) => {
                   const items = event.clipboardData?.files;
                   if (items?.length) {
@@ -627,153 +646,143 @@ export function AiChat({
                 }}
               />
 
-              <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
+              <InputGroupAddon align="inline-end" className="pe-1.5">
+                {busy ? (
+                  <InputGroupButton
                     size="icon-sm"
-                    variant="ghost"
-                    aria-label="Attach files"
-                    disabled={busy}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <PlusIcon />
-                  </Button>
-
-                  <Popover
-                    onOpenChange={(open) => {
-                      if (open) void fetchHistory();
+                    aria-label="Stop"
+                    onClick={() => {
+                      stop();
+                      focusComposer();
                     }}
                   >
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label="Chat history"
-                          title="Recents"
-                          disabled={busy}
-                        >
-                          <RotateCcwIcon />
-                        </Button>
-                      }
-                    />
-                    <PopoverContent
-                      align="start"
-                      side="top"
-                      className="w-40 p-1.5"
-                    >
-                      <div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
-                        <button
-                          type="button"
-                          onClick={startNewChat}
-                          className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                        >
-                          <PlusIcon className="size-3.5" />
-                          <span>New Chat</span>
-                        </button>
+                    <SquareIcon />
+                  </InputGroupButton>
+                ) : canSend ? (
+                  <InputGroupButton
+                    type="submit"
+                    size="icon-sm"
+                    aria-label="Send"
+                  >
+                    <ArrowUpIcon />
+                  </InputGroupButton>
+                ) : (
+                  <span
+                    aria-hidden
+                    className="flex size-7 items-center justify-center text-muted-foreground [&_svg]:size-3.5"
+                  >
+                    <MicIcon />
+                  </span>
+                )}
 
-                        {loadingHistory ? (
-                          <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
-                            <Spinner className="me-2 size-3.5" /> Loading...
-                          </div>
-                        ) : historyList.length === 0 ? (
-                          <div className="p-3 text-center text-xs text-muted-foreground">
-                            No saved chats yet
-                          </div>
-                        ) : (
-                          historyList.map((item) => (
-                            <div
-                              key={item.id}
-                              onClick={() => void loadConversation(item.id)}
-                              className={cn(
-                                "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-colors",
-                                item.id === conversationId
-                                  ? "bg-accent font-medium text-accent-foreground"
-                                  : "text-foreground hover:bg-muted/70",
-                              )}
+                <DropdownMenu
+                  onOpenChange={(open) => {
+                    if (open) void fetchHistory();
+                  }}
+                >
+                  <DropdownMenuTrigger
+                    render={
+                      <InputGroupButton
+                        size="icon-sm"
+                        aria-label="Chat history"
+                        disabled={busy}
+                      />
+                    }
+                  >
+                    <ChevronDownIcon />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    side="top"
+                    className="w-56"
+                  >
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem onClick={startNewChat}>
+                        <PlusIcon />
+                        New chat
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Recents</DropdownMenuLabel>
+                      {loadingHistory ? (
+                        <div className="flex items-center justify-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                          <Spinner />
+                          Loading…
+                        </div>
+                      ) : historyList.length === 0 ? (
+                        <p className="px-2 py-2 text-xs text-muted-foreground">
+                          No saved chats yet
+                        </p>
+                      ) : (
+                        historyList.map((item) => (
+                          <DropdownMenuItem
+                            key={item.id}
+                            className="pe-1"
+                            onClick={(event) => {
+                              if (
+                                (event.target as HTMLElement).closest("button")
+                              ) {
+                                return;
+                              }
+                              void loadConversation(item.id);
+                            }}
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {loadingChatId === item.id
+                                ? "Loading..."
+                                : item.title}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon-xs"
+                              variant="ghost"
+                              aria-label={`Delete ${item.title}`}
+                              onClick={(event) =>
+                                void handleDeleteChat(item.id, event)
+                              }
                             >
-                              <div className="me-2 min-w-0 flex-1">
-                                <p
-                                  className="truncate text-xs"
-                                  title={item.title}
-                                >
-                                  {loadingChatId === item.id
-                                    ? "Loading..."
-                                    : item.title}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                size="icon-xs"
-                                variant="ghost"
-                                className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
-                                onClick={(e) =>
-                                  void handleDeleteChat(item.id, e)
-                                }
-                                title="Delete conversation"
-                              >
-                                <Trash2Icon className="size-3.5" />
-                              </Button>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                              <Trash2Icon />
+                            </Button>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </InputGroupAddon>
+            </InputGroup>
 
-                <div className="flex min-w-0 items-center gap-2">
-                  <Select
-                    value={modelId}
-                    onValueChange={(value) => {
-                      if (value)
-                        setModelId(resolveChatModelId(value) as ChatModelId);
-                    }}
-                  >
-                    <SelectTrigger
-                      size="sm"
-                      className="max-w-44 border-0 bg-transparent shadow-none dark:bg-transparent"
-                      aria-label="Select model"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent align="end" className="min-w-52">
-                      <SelectGroup>
-                        {CHAT_MODELS.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {busy ? (
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="secondary"
-                      aria-label="Stop"
-                      onClick={() => {
-                        stop();
-                        focusComposer();
-                      }}
-                    >
-                      <SquareIcon />
-                    </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      size="icon-sm"
-                      aria-label="Send"
-                      disabled={!canSend}
-                    >
-                      <ArrowUpIcon />
-                    </Button>
-                  )}
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-3 px-1">
+              <p className="min-w-0 truncate text-[11px] text-muted-foreground">
+                AI can make mistakes. Please double-check cited sources.
+              </p>
+              <Select
+                value={modelId}
+                onValueChange={(value) => {
+                  if (value)
+                    setModelId(resolveChatModelId(value) as ChatModelId);
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="h-auto max-w-none shrink-0 gap-1 border-0 bg-transparent p-0 shadow-none hover:bg-transparent"
+                  aria-label="Select model"
+                >
+                  <span className="text-[11px] text-foreground">
+                    {getChatModel(modelId)?.shortLabel ?? "Model"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent align="end" className="min-w-52">
+                  <SelectGroup>
+                    {CHAT_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           </form>
         </div>
