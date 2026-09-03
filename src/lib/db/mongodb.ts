@@ -22,7 +22,25 @@ if (!dbName) {
   throw new Error("DB_NAME environment variable is not set");
 }
 
-/** Shared DB handle — Better Auth collections live here */
+/** Centralized MongoDB collection names for the application */
+export const COLLECTIONS = {
+  // Chat Conversations
+  CHAT_CONVERSATIONS: "chat_conversations",
+
+  // Better Auth Core
+  USER: "user",
+  ACCOUNT: "account",
+  SESSION: "session",
+  VERIFICATION: "verification",
+  RATE_LIMIT: "rateLimit",
+
+  // Better Auth Organization Plugin
+  ORGANIZATION: "organization",
+  MEMBER: "member",
+  INVITATION: "invitation",
+} as const;
+
+/** Shared DB handle — Better Auth and App collections live here */
 export const db = client.db(dbName);
 
 // Create recommended indexes once per cold start (createIndex is idempotent)

@@ -17,9 +17,12 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
   ImageIcon,
+  MessageSquareIcon,
+  MessageSquarePlusIcon,
   PlusIcon,
   SparklesIcon,
   SquareIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react";
 import type {
@@ -90,9 +93,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import type { ChatConversationMeta } from "@/lib/db/chat";
 import { cn } from "@/lib/utils";
 
 const SUPPORTED_IMAGE_TYPES = new Set([
@@ -223,8 +233,16 @@ export function AiChat({
       }),
     [],
   );
+  const [conversationId, setConversationId] = React.useState<string>(
+    () => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+  );
+  const [historyList, setHistoryList] = React.useState<ChatConversationMeta[]>([]);
+  const [loadingHistory, setLoadingHistory] = React.useState(false);
+  const [loadingChatId, setLoadingChatId] = React.useState<string | null>(null);
+
   const {
     messages,
+    setMessages,
     sendMessage,
     status,
     stop,
@@ -245,6 +263,89 @@ export function AiChat({
       }
     },
   });
+
+  const fetchHistory = React.useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch("/api/chat/history");
+      if (res.ok) {
+        const data = (await res.json()) as { conversations?: ChatConversationMeta[] };
+        setHistoryList(data.conversations || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch chat history:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  // Auto-save textual history on status ready
+  React.useEffect(() => {
+    if (status === "ready" && messages.length > 0) {
+      fetch("/api/chat/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: conversationId,
+          messages,
+        }),
+      })
+        .then(() => fetchHistory())
+        .catch((err) => console.error("Auto-save failed:", err));
+    }
+  }, [status, messages, conversationId, fetchHistory]);
+
+  async function loadConversation(id: string) {
+    if (id === conversationId || busy) return;
+    setLoadingChatId(id);
+    try {
+      const res = await fetch(`/api/chat/history/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.conversation?.messages) {
+          setMessages(data.conversation.messages);
+          setConversationId(id);
+        }
+      } else {
+        toast.add({
+          title: "Could not load chat",
+          description: "Conversation not found",
+        });
+      }
+    } catch (err) {
+      toast.add({
+        title: "Could not load chat",
+        description: String(err),
+      });
+    } finally {
+      setLoadingChatId(null);
+    }
+  }
+
+  function startNewChat() {
+    if (busy) return;
+    const newId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setConversationId(newId);
+    setMessages([]);
+    setInput("");
+    setPendingFiles([]);
+    focusComposer();
+  }
+
+  async function handleDeleteChat(id: string, event: React.MouseEvent) {
+    event.stopPropagation();
+    try {
+      const res = await fetch(`/api/chat/history/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setHistoryList((prev) => prev.filter((item) => item.id !== id));
+        if (id === conversationId) {
+          startNewChat();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete chat:", err);
+    }
+  }
 
   const busy = status === "submitted" || status === "streaming";
   const canSend = Boolean(input.trim() || pendingFiles.length > 0);
@@ -440,16 +541,97 @@ export function AiChat({
           />
 
           <div className="flex items-center justify-between gap-2 px-2 pb-2">
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Attach files"
-              disabled={busy}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <PlusIcon />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Attach files"
+                disabled={busy}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <PlusIcon />
+              </Button>
+
+              <Popover
+                onOpenChange={(open) => {
+                  if (open) void fetchHistory();
+                }}
+              >
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Chat history"
+                      title="Recents"
+                      disabled={busy}
+                    >
+                      <MessageSquareIcon />
+                    </Button>
+                  }
+                />
+                <PopoverContent align="start" side="top" className="w-80 p-2">
+                  <div className="mb-1 flex items-center justify-between border-b border-border px-2 py-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Recents
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={startNewChat}
+                    >
+                      <MessageSquarePlusIcon className="size-3.5" />
+                      New Chat
+                    </Button>
+                  </div>
+
+                  <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+                    {loadingHistory ? (
+                      <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
+                        <Spinner className="me-2 size-4" /> Loading history...
+                      </div>
+                    ) : historyList.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        No saved chats for this organization yet.
+                      </div>
+                    ) : (
+                      historyList.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => void loadConversation(item.id)}
+                          className={cn(
+                            "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-2 text-xs transition-colors",
+                            item.id === conversationId
+                              ? "bg-accent font-medium text-accent-foreground"
+                              : "text-foreground hover:bg-muted/70",
+                          )}
+                        >
+                          <div className="me-2 min-w-0 flex-1">
+                            <p className="truncate text-xs">
+                              {loadingChatId === item.id ? "Loading..." : item.title}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="icon-xs"
+                            variant="ghost"
+                            className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
+                            onClick={(e) => void handleDeleteChat(item.id, e)}
+                            title="Delete conversation"
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
 
             <div className="flex min-w-0 items-center gap-2">
               <Select
