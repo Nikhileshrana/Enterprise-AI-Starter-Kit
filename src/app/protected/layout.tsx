@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentSession } from "@/lib/auth/session";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ProtectedLayout({
   children,
@@ -44,9 +45,9 @@ async function ProtectedLayoutContent({
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 overflow-hidden">
         <MobileTopBar user={user} />
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <ScrollArea className="flex min-h-svh flex-1 flex-col">
           {children}
-        </div>
+        </ScrollArea>
         <MobileBottomNav />
       </SidebarInset>
       <OrganizationGate userId={session.user.id} />
