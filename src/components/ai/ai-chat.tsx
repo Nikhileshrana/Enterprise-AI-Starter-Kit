@@ -20,6 +20,7 @@ import {
   MessageSquareIcon,
   MessageSquarePlusIcon,
   PlusIcon,
+  RotateCcwIcon,
   SparklesIcon,
   SquareIcon,
   Trash2Icon,
@@ -572,31 +573,24 @@ export function AiChat({
                     </Button>
                   }
                 />
-                <PopoverContent align="start" side="top" className="w-80 p-2">
-                  <div className="mb-1 flex items-center justify-between border-b border-border px-2 py-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Recents
-                    </span>
-                    <Button
+                <PopoverContent align="start" side="top" className="w-40 p-1.5">
+                  <div className="flex max-h-60 flex-col gap-0.5 overflow-y-auto">
+                    <button
                       type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1.5 px-2 text-xs"
                       onClick={startNewChat}
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                     >
-                      <MessageSquarePlusIcon className="size-3.5" />
-                      New Chat
-                    </Button>
-                  </div>
+                      <PlusIcon className="size-3.5" />
+                      <span>New Chat</span>
+                    </button>
 
-                  <div className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
                     {loadingHistory ? (
-                      <div className="flex items-center justify-center p-4 text-xs text-muted-foreground">
-                        <Spinner className="me-2 size-4" /> Loading history...
+                      <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
+                        <Spinner className="me-2 size-3.5" /> Loading...
                       </div>
                     ) : historyList.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-muted-foreground">
-                        No saved chats for this organization yet.
+                      <div className="p-3 text-center text-xs text-muted-foreground">
+                        No saved chats yet
                       </div>
                     ) : (
                       historyList.map((item) => (
@@ -604,14 +598,14 @@ export function AiChat({
                           key={item.id}
                           onClick={() => void loadConversation(item.id)}
                           className={cn(
-                            "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-2 text-xs transition-colors",
+                            "group flex cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-xs transition-colors",
                             item.id === conversationId
                               ? "bg-accent font-medium text-accent-foreground"
                               : "text-foreground hover:bg-muted/70",
                           )}
                         >
                           <div className="me-2 min-w-0 flex-1">
-                            <p className="truncate text-xs">
+                            <p className="truncate text-xs" title={item.title}>
                               {loadingChatId === item.id ? "Loading..." : item.title}
                             </p>
                           </div>

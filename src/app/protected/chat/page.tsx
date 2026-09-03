@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
 import { KeyRoundIcon } from "lucide-react";
 
-export default function AiPage() {
+export default function ChatPage() {
   return (
     <Suspense
       fallback={
@@ -46,12 +46,12 @@ export default function AiPage() {
         </div>
       }
     >
-      <AiPageContent />
+      <ChatPageContent />
     </Suspense>
   );
 }
 
-async function AiPageContent() {
+async function ChatPageContent() {
   if (!isAiGatewayConfigured()) {
     return (
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-4 overflow-y-auto">

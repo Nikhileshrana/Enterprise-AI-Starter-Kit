@@ -12,8 +12,8 @@ export const PLATFORM_NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboardIcon,
   },
   {
-    title: "AI",
-    url: "/protected/ai",
+    title: "Chat",
+    url: "/protected/chat",
     icon: SparklesIcon,
   },
   {
