@@ -103,6 +103,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import {
+  ArtifactDialog,
+  type ArtifactData,
+} from "@/components/ai/artifact-dialog";
 import type { ChatConversationMeta } from "@/lib/db/chat";
 import { cn } from "@/lib/utils";
 
@@ -234,6 +238,10 @@ export function AiChat({
       }),
     [],
   );
+  const [activeArtifact, setActiveArtifact] = React.useState<ArtifactData | null>(null);
+  const [artifactDialogOpen, setArtifactDialogOpen] = React.useState(false);
+  const lastOpenedArtifactIdRef = React.useRef<string | null>(null);
+
   const [conversationId, setConversationId] = React.useState<string>(
     () => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
   );
@@ -264,6 +272,34 @@ export function AiChat({
       }
     },
   });
+
+  function handleOpenArtifact(art: ArtifactData) {
+    setActiveArtifact(art);
+    setArtifactDialogOpen(true);
+  }
+
+  // Auto-launch Artifact Dialog when a new createDocument tool call completes
+  React.useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return;
+    for (const part of lastMsg.parts) {
+      if (
+        part.type === "tool-createDocument" &&
+        part.state === "output-available" &&
+        part.output
+      ) {
+        if (lastOpenedArtifactIdRef.current !== part.output.id) {
+          lastOpenedArtifactIdRef.current = part.output.id;
+          handleOpenArtifact({
+            id: part.output.id,
+            title: part.output.title,
+            kind: part.output.kind,
+            content: part.output.content,
+          });
+        }
+      }
+    }
+  }, [messages]);
 
   const fetchHistory = React.useCallback(async () => {
     setLoadingHistory(true);
@@ -464,6 +500,7 @@ export function AiChat({
                               part={part}
                               addToolOutput={addToolOutput}
                               addToolApprovalResponse={addToolApprovalResponse}
+                              onOpenArtifact={handleOpenArtifact}
                             />
                           ))}
                         </div>
@@ -506,7 +543,7 @@ export function AiChat({
           }}
         />
 
-        <div className="rounded-2xl border border-border bg-muted/40 shadow-sm transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
+        <div className="rounded-2xl border border-border bg-muted/40 shadow-xs transition-colors focus-within:border-ring/50 focus-within:ring-2 focus-within:ring-ring/15">
           {pendingFiles.length > 0 ? (
             <div className="flex flex-wrap gap-2 px-3 pt-3">
               {pendingFiles.map((file, index) => (
@@ -569,7 +606,7 @@ export function AiChat({
                       title="Recents"
                       disabled={busy}
                     >
-                      <MessageSquareIcon />
+                      <RotateCcwIcon />
                     </Button>
                   }
                 />
@@ -625,6 +662,7 @@ export function AiChat({
                   </div>
                 </PopoverContent>
               </Popover>
+
             </div>
 
             <div className="flex min-w-0 items-center gap-2">
@@ -678,6 +716,12 @@ export function AiChat({
           </div>
         </div>
       </form>
+
+      <ArtifactDialog
+        artifact={activeArtifact}
+        open={artifactDialogOpen}
+        onOpenChange={setArtifactDialogOpen}
+      />
     </div>
   );
 }
@@ -797,6 +841,7 @@ function MessagePartView({
   part,
   addToolOutput,
   addToolApprovalResponse,
+  onOpenArtifact,
 }: MessagePartViewProps) {
   if (isTextUIPart(part)) {
     if (!part.text) return null;
@@ -865,8 +910,70 @@ function MessagePartView({
       <QuestionnaireToolPart part={part} addToolOutput={addToolOutput} />
     );
   }
+  if (part.type === "tool-createDocument") {
+    return (
+      <DocumentArtifactToolPart
+        part={part}
+        onOpenArtifact={onOpenArtifact}
+      />
+    );
+  }
 
   return null;
+}
+
+function DocumentArtifactToolPart({
+  part,
+  onOpenArtifact,
+}: {
+  part: Extract<StarterKitUIMessage["parts"][number], { type: "tool-createDocument" }>;
+  onOpenArtifact?: (artifact: ArtifactData) => void;
+}) {
+  switch (part.state) {
+    case "input-streaming":
+    case "input-available":
+      return <ToolPending label={`Generating ${part.input?.title || "document artifact"}…`} />;
+    case "output-available":
+      if (!part.output) return null;
+      return (
+        <div className="flex w-full max-w-md items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <FileTextIcon className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium text-card-foreground">
+                {part.output.title}
+              </p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {part.output.kind || "document"} artifact
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="shrink-0 gap-1.5 text-xs"
+            onClick={() =>
+              onOpenArtifact?.({
+                id: part.output.id,
+                title: part.output.title,
+                kind: part.output.kind,
+                content: part.output.content,
+              })
+            }
+          >
+            <SparklesIcon className="size-3.5" />
+            View Artifact
+          </Button>
+        </div>
+      );
+    case "output-error":
+      return <ToolError text={part.errorText} />;
+    default:
+      return null;
+  }
 }
 
 function WeatherToolPart({

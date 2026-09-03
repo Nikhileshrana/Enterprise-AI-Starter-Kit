@@ -103,6 +103,33 @@ export const askQuestionnaire = tool({
   }),
 });
 
+/**
+ * Server tool — Artifact Generator for creating rich documents, reports, proposals, HTML layouts, and code.
+ */
+export const createDocument = tool({
+  description:
+    "Generate an interactive document, report, proposal, flyer, resume, newsletter, or HTML design artifact. Always use rich HTML formatting inside content for headers, tables, styled containers, and typography.",
+  inputSchema: z.object({
+    title: z.string().describe("Descriptive document or artifact title"),
+    kind: z
+      .enum(["document", "html", "code", "report"])
+      .default("document")
+      .describe("Kind of artifact being generated"),
+    content: z
+      .string()
+      .describe("Rich HTML formatted content for the document artifact"),
+  }),
+  execute: async ({ title, kind, content }) => {
+    return {
+      id: `art_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title,
+      kind,
+      content,
+      generatedAt: new Date().toISOString(),
+    };
+  },
+});
+
 export const agentTools = {
   displayWeather,
   getStockPrice,
@@ -110,4 +137,5 @@ export const agentTools = {
   askForConfirmation,
   getBrowserTimezone,
   askQuestionnaire,
+  createDocument,
 };

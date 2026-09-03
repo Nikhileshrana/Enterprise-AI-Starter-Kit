@@ -19,6 +19,12 @@ export type ChatHelpers = {
 export type MessagePartViewProps = ChatHelpers & {
   role: StarterKitUIMessage["role"];
   part: StarterKitUIMessage["parts"][number];
+  onOpenArtifact?: (artifact: {
+    id: string;
+    title: string;
+    kind?: "document" | "html" | "code" | "report";
+    content: string;
+  }) => void;
 };
 
 export type StockCardProps = {
