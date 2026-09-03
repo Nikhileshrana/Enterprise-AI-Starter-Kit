@@ -1,12 +1,15 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth/server";
 import { deleteConversation, getConversation } from "@/lib/db/chat";
+import { ensureDbReady } from "@/lib/db/mongodb";
 
 export async function GET(
   _request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
   const params = await props.params;
+  await ensureDbReady();
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -42,6 +45,8 @@ export async function DELETE(
   props: { params: Promise<{ id: string }> },
 ) {
   const params = await props.params;
+  await ensureDbReady();
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });

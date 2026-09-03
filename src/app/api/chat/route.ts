@@ -1,9 +1,10 @@
 import { createAgentUIStreamResponse } from "ai";
 import { headers } from "next/headers";
 import { starterKitAgent } from "@/lib/ai/agent";
-import { isAiGatewayConfigured, getAiGatewayModel } from "@/lib/ai/gateway";
+import { getAiGatewayModel, isAiGatewayConfigured } from "@/lib/ai/gateway";
 import { resolveChatModelId } from "@/lib/ai/models";
 import { auth } from "@/lib/auth/server";
+import { ensureDbReady } from "@/lib/db/mongodb";
 import type { ChatRequestBody } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
+
+  await ensureDbReady();
 
   const session = await auth.api.getSession({
     headers: await headers(),

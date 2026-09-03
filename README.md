@@ -171,6 +171,34 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+Verify auth is wired correctly:
+
+```bash
+curl http://localhost:3000/api/auth/ok
+# → {"status":"ok"}
+```
+
+### MongoDB on Vercel (Atlas)
+
+This project follows the documented patterns for **Better Auth + MongoDB + Vercel Fluid Compute**:
+
+| Concern | Approach |
+|---------|----------|
+| Adapter | `mongodbAdapter(db, { client })` with shared `MongoClient` ([docs](https://www.better-auth.com/docs/adapters/mongo)) |
+| Connection pooling | `attachDatabasePool(client)` ([Vercel docs](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#attachdatabasepool)) |
+| Cold starts | `ensureDbReady()` connects with retry before auth/DB routes run |
+| Indexes | Idempotent `createIndex` in background via `after()` ([performance guide](https://www.better-auth.com/docs/guides/optimizing-for-performance)) |
+| Joins | `advanced.database.joins: true` for faster session/org queries |
+| Rate limits | `rateLimit.storage: "database"` (not in-memory) for serverless |
+| Protected routes | Cookie check in `proxy.ts`, full `getSession` in layout ([Next.js integration](https://www.better-auth.com/docs/integrations/next)) |
+
+**Atlas checklist** (fixes `ReplicaSetNoPrimary` / timeout on first login):
+
+1. Use the **`mongodb+srv://`** connection string from Atlas
+2. **Network Access** → allow your IP or `0.0.0.0/0` for Vercel
+3. Confirm the cluster is **not paused** (M0 free tier sleeps after inactivity)
+4. Deploy region close to your Atlas cluster region
+
 ### Scripts
 
 | Command | Description |

@@ -4,9 +4,12 @@ import {
   listOrgConversations,
   saveConversation,
 } from "@/lib/db/chat";
+import { ensureDbReady } from "@/lib/db/mongodb";
 import type { StarterKitUIMessage } from "@/lib/types";
 
 export async function GET() {
+  await ensureDbReady();
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -31,6 +34,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  await ensureDbReady();
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });

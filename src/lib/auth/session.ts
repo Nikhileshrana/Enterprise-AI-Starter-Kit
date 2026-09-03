@@ -3,6 +3,7 @@ import "server-only";
 import { cacheLife } from "next/cache";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth/server";
+import { ensureDbReady } from "@/lib/db/mongodb";
 import type { CurrentUser, Session } from "@/lib/types";
 
 /**
@@ -12,6 +13,8 @@ import type { CurrentUser, Session } from "@/lib/types";
 export async function getCurrentSession(): Promise<Session | null> {
   "use cache: private";
   cacheLife("minutes");
+
+  await ensureDbReady();
 
   return auth.api.getSession({
     headers: await headers(),
