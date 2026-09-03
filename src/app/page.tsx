@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Item,
@@ -16,6 +17,37 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { signIn, useSession } from "@/lib/auth/client";
+
+const moduleGroups = [
+  {
+    title: "Core",
+    modules: ["Next.js 16", "React 19", "TypeScript", "Tailwind v4", "Biome"],
+  },
+  {
+    title: "Auth",
+    modules: ["Better Auth", "Google OAuth", "Sessions", "Protected routes"],
+  },
+  {
+    title: "Multi-tenancy",
+    modules: ["Organizations", "RBAC", "Invitations", "Member settings"],
+  },
+  {
+    title: "Data",
+    modules: ["MongoDB", "Chat history", "Vercel Blob"],
+  },
+  {
+    title: "AI platform",
+    modules: ["AI SDK v7", "AI Gateway", "Tool-loop agent", "Streaming chat"],
+  },
+  {
+    title: "AI tools",
+    modules: ["Generative UI", "Approvals", "Web search", "Artifacts", "Export"],
+  },
+  {
+    title: "UI",
+    modules: ["shadcn/ui", "Themes", "Sidebar", "Data tables", "Charts"],
+  },
+] as const;
 
 function initials(name: string) {
   return (
@@ -93,7 +125,7 @@ export default function Home() {
   const { data: session, isPending } = useSession();
 
   return (
-    <div className="flex min-h-svh flex-1 bg-background text-foreground">
+    <div className="flex h-svh overflow-hidden bg-background text-foreground lg:flex-row">
       <div className="flex flex-1 items-center justify-center p-6 lg:p-12">
         <Image
           src="/logo.svg"
@@ -105,67 +137,100 @@ export default function Home() {
           className="h-auto w-full max-w-md lg:max-w-xl"
         />
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-16">
-        <h1 className="font-heading text-2xl font-semibold tracking-[0.28em] uppercase">
-          Starter Kit
-        </h1>
-        {isPending ? (
-          <Skeleton className="h-36 w-full max-w-sm" />
-        ) : !session ? (
-          <div className="flex w-full max-w-sm flex-col items-center gap-8">
-            <p className="text-center text-sm text-foreground">
-              Sign in to continue to your workspace.
-            </p>
-            <Suspense
-              fallback={
-                <Button
-                  size="lg"
-                  className="h-11 min-w-56 rounded-full px-8"
-                  disabled
-                >
-                  <Spinner data-icon="inline-start" />
-                  Sign in with Google
-                </Button>
-              }
-            >
-              <LoginButton />
-            </Suspense>
-          </div>
-        ) : (
-          <div className="flex w-full max-w-sm flex-col items-center gap-8">
-            <Item variant="outline" className="w-full">
-              <ItemMedia>
-                <Avatar>
-                  {session.user.image ? (
-                    <AvatarImage src={session.user.image} alt={session.user.name} />
-                  ) : null}
-                  <AvatarFallback>{initials(session.user.name)}</AvatarFallback>
-                </Avatar>
-              </ItemMedia>
-              <ItemContent>
-                <ItemTitle>{session.user.name}</ItemTitle>
-              </ItemContent>
-              <ItemActions>
-                <span className="text-muted-foreground">Signed in</span>
-              </ItemActions>
-            </Item>
-            <p className="text-center text-sm text-foreground">
-              Continue to your workspace to chat, create artifacts, and work with
-              your team.
-            </p>
-            <Button
-              nativeButton={false}
-              render={<Link href="/protected/dashboard" />}
-              size="lg"
-              className="h-11 min-w-56 rounded-full px-8"
-            >
-              Continue to workspace
-            </Button>
-          </div>
-        )}
-        <p className="max-w-xs text-center text-[0.625rem] text-muted-foreground">
-          By continuing you agree to the Terms of Service and Privacy Policy.
-        </p>
+
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-5 border-t border-border px-6 py-6 sm:gap-6 sm:px-8 lg:max-w-xl lg:border-t-0 lg:border-l lg:px-10 xl:max-w-2xl">
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[0.625rem] font-medium tracking-[0.28em] text-muted-foreground uppercase">
+            Enterprise ready AI starter kit
+          </p>
+          <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+            Ship high-end enterprise applications
+          </h1>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Auth, multi-tenancy, AI agents, storage, and a full UI system —
+            wired together out of the box.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+          {moduleGroups.map((group) => (
+            <section key={group.title} className="flex flex-col gap-1">
+              <h2 className="text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase">
+                {group.title}
+              </h2>
+              <div className="flex flex-wrap gap-1">
+                {group.modules.map((module) => (
+                  <Badge
+                    key={module}
+                    variant="secondary"
+                    className="px-1.5 py-0 text-[0.625rem] font-normal"
+                  >
+                    {module}
+                  </Badge>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <div className="flex flex-col items-center gap-4 border-t border-border pt-5">
+          {isPending ? (
+            <Skeleton className="h-11 w-56 rounded-full" />
+          ) : !session ? (
+            <>
+              <p className="text-center text-sm text-foreground">
+                Sign in to continue to your workspace.
+              </p>
+              <Suspense
+                fallback={
+                  <Button
+                    size="lg"
+                    className="h-11 min-w-56 rounded-full px-8"
+                    disabled
+                  >
+                    <Spinner data-icon="inline-start" />
+                    Sign in with Google
+                  </Button>
+                }
+              >
+                <LoginButton />
+              </Suspense>
+            </>
+          ) : (
+            <div className="flex w-full max-w-sm flex-col items-center gap-4">
+              <Item variant="outline" className="w-full">
+                <ItemMedia>
+                  <Avatar>
+                    {session.user.image ? (
+                      <AvatarImage
+                        src={session.user.image}
+                        alt={session.user.name}
+                      />
+                    ) : null}
+                    <AvatarFallback>{initials(session.user.name)}</AvatarFallback>
+                  </Avatar>
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{session.user.name}</ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <span className="text-muted-foreground">Signed in</span>
+                </ItemActions>
+              </Item>
+              <Button
+                nativeButton={false}
+                render={<Link href="/protected/dashboard" />}
+                size="lg"
+                className="h-11 min-w-56 rounded-full px-8"
+              >
+                Continue to workspace
+              </Button>
+            </div>
+          )}
+          <p className="text-center text-[0.625rem] text-muted-foreground">
+            By continuing you agree to the Terms of Service and Privacy Policy.
+          </p>
+        </div>
       </div>
     </div>
   );

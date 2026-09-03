@@ -1,8 +1,18 @@
 "use client";
 
-import * as React from "react";
 import { Loader2Icon } from "lucide-react";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import {
+  GlobalWorkerOptions,
+  getDocument,
+  type PDFDocumentProxy,
+} from "pdfjs-dist";
+import * as React from "react";
+
+// Load the worker from the installed pdfjs-dist package (no public/ copy).
+GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 interface PdfViewerProps {
   blob: Blob | null;
@@ -46,10 +56,8 @@ export function PdfViewer({ blob, generating, zoom = 1 }: PdfViewerProps) {
 
     (async () => {
       try {
-        const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const data = await blob.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data }).promise;
+        const pdf = await getDocument({ data }).promise;
         if (cancelled) return;
         pdfRef.current = pdf;
         setPageCount(pdf.numPages);
