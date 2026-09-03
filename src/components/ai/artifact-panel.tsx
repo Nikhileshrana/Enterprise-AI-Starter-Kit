@@ -7,13 +7,15 @@ import {
   Loader2Icon,
   Maximize2Icon,
   Minimize2Icon,
+  MinusIcon,
+  PlusIcon,
   XIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { buildArtifactDocument, renderHtmlToPdfBlob } from "@/lib/export-utils";
-import { cn } from "@/lib/utils";
+import { renderHtmlToPdfBlob } from "@/lib/export-utils";
 import { toast } from "@/components/ui/toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { PdfViewer } from "@/components/ai/pdf-viewer";
 
 export interface ArtifactData {
   id: string;
@@ -34,12 +36,39 @@ export function ArtifactPanel({
   onOpenChange,
 }: ArtifactPanelProps) {
   const isMobile = useIsMobile();
-  const [tab, setTab] = React.useState<"preview" | "code">("preview");
   const [expanded, setExpanded] = React.useState(false);
   const [downloading, setDownloading] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
+  const [pdfBlob, setPdfBlob] = React.useState<Blob | null>(null);
+  const [zoom, setZoom] = React.useState(1);
 
   React.useEffect(() => {
-    if (open) setTab("preview");
+    if (!open || !artifact) {
+      setPdfBlob(null);
+      setZoom(1);
+      return;
+    }
+
+    let cancelled = false;
+    setGenerating(true);
+    setPdfBlob(null);
+
+    renderHtmlToPdfBlob(artifact.content)
+      .then((blob) => {
+        if (!cancelled) setPdfBlob(blob);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          toast.add({ title: "Failed to render PDF", description: String(err) });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGenerating(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, artifact]);
 
   const slugTitle = artifact
@@ -50,25 +79,40 @@ export function ArtifactPanel({
     : "";
 
   async function handleDownloadPdf() {
-    if (!artifact) return;
-    setDownloading(true);
-    try {
-      const blob = await renderHtmlToPdfBlob(artifact.content);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${slugTitle || "document"}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.add({ title: "PDF downloaded" });
-    } catch (err) {
-      toast.add({ title: "Failed to download PDF", description: String(err) });
-    } finally {
-      setDownloading(false);
+    const blob = pdfBlob;
+    if (!blob) {
+      toast.add({ title: "PDF is still generating" });
+      return;
     }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${slugTitle || "document"}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.add({ title: "PDF downloaded" });
   }
 
   const panelWidth = expanded ? "58%" : "42%";
+  const header = (
+    <PanelHeader
+      title={artifact?.title}
+      downloading={downloading}
+      generating={generating}
+      zoom={zoom}
+      onZoomOut={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+      onZoomIn={() => setZoom((z) => Math.min(2, Math.round((z + 0.25) * 100) / 100))}
+      onDownload={() => void handleDownloadPdf()}
+      onExpand={() => setExpanded((v) => !v)}
+      expanded={expanded}
+      onClose={() => onOpenChange(false)}
+    />
+  );
+  const body = (
+    <div className="relative min-h-0 flex-1">
+      <PdfViewer blob={pdfBlob} generating={generating} zoom={zoom} />
+    </div>
+  );
 
   if (isMobile) {
     return (
@@ -82,16 +126,8 @@ export function ArtifactPanel({
             className="fixed inset-0 z-50 flex flex-col bg-card p-3"
           >
             <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <PanelHeader
-                tab={tab}
-                setTab={setTab}
-                downloading={downloading}
-                onDownload={handleDownloadPdf}
-                onExpand={() => setExpanded((v) => !v)}
-                expanded={expanded}
-                onClose={() => onOpenChange(false)}
-              />
-              <PanelBody tab={tab} artifact={artifact} />
+              {header}
+              {body}
             </div>
           </motion.div>
         ) : null}
@@ -111,16 +147,8 @@ export function ArtifactPanel({
           className="flex min-h-0 shrink-0 flex-col overflow-hidden"
         >
           <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <PanelHeader
-              tab={tab}
-              setTab={setTab}
-              downloading={downloading}
-              onDownload={handleDownloadPdf}
-              onExpand={() => setExpanded((v) => !v)}
-              expanded={expanded}
-              onClose={() => onOpenChange(false)}
-            />
-            <PanelBody tab={tab} artifact={artifact} />
+            {header}
+            {body}
           </div>
         </motion.aside>
       ) : null}
@@ -129,17 +157,23 @@ export function ArtifactPanel({
 }
 
 function PanelHeader({
-  tab,
-  setTab,
+  title,
   downloading,
+  generating,
+  zoom,
+  onZoomOut,
+  onZoomIn,
   onDownload,
   onExpand,
   expanded,
   onClose,
 }: {
-  tab: "preview" | "code";
-  setTab: (t: "preview" | "code") => void;
+  title?: string;
   downloading: boolean;
+  generating: boolean;
+  zoom: number;
+  onZoomOut: () => void;
+  onZoomIn: () => void;
   onDownload: () => void;
   onExpand: () => void;
   expanded: boolean;
@@ -147,41 +181,40 @@ function PanelHeader({
 }) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
-      <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-0.5">
-        <button
-          type="button"
-          onClick={() => setTab("preview")}
-          className={cn(
-            "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-            tab === "preview"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Preview
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("code")}
-          className={cn(
-            "rounded-md px-3 py-1 text-xs font-medium transition-colors",
-            tab === "code"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Code
-        </button>
-      </div>
-
+      <p className="min-w-0 truncate text-xs font-medium">
+        {title || "Document"}
+        <span className="ms-2 font-normal text-muted-foreground">· PDF</span>
+      </p>
       <div className="flex items-center gap-0.5">
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          onClick={onZoomOut}
+          title="Zoom out"
+          disabled={generating || zoom <= 0.5}
+          className="size-8"
+        >
+          <MinusIcon className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          onClick={onZoomIn}
+          title="Zoom in"
+          disabled={generating || zoom >= 2}
+          className="size-8"
+        >
+          <PlusIcon className="size-4" />
+        </Button>
         <Button
           type="button"
           size="icon-sm"
           variant="ghost"
           onClick={onDownload}
           title="Download PDF"
-          disabled={downloading}
+          disabled={downloading || generating}
           className="size-8"
         >
           {downloading ? (
@@ -216,37 +249,5 @@ function PanelHeader({
         </Button>
       </div>
     </header>
-  );
-}
-
-function PanelBody({
-  tab,
-  artifact,
-}: {
-  tab: "preview" | "code";
-  artifact: ArtifactData;
-}) {
-  if (tab === "code") {
-    return (
-      <div className="flex-1 min-h-0 overflow-auto bg-zinc-950 p-4">
-        <pre className="text-xs leading-relaxed text-zinc-200 whitespace-pre-wrap wrap-break-word font-mono">
-          <code>{artifact.content}</code>
-        </pre>
-      </div>
-    );
-  }
-
-  const srcDoc = buildArtifactDocument(artifact.title, artifact.content);
-
-  return (
-    <div className="relative flex-1 min-h-0 bg-[#3f3f46]">
-      <iframe
-        key={artifact.id}
-        srcDoc={srcDoc}
-        title={artifact.title || "Document preview"}
-        sandbox="allow-same-origin allow-scripts"
-        className="h-full w-full border-0 bg-[#3f3f46]"
-      />
-    </div>
   );
 }

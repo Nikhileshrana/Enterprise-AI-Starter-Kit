@@ -19,7 +19,7 @@ export function MarkdownMessage({
 }) {
   return (
     <Streamdown
-      animated
+      animated={isAnimating}
       isAnimating={isAnimating}
       remarkPlugins={remarkPlugins}
       className={cn(

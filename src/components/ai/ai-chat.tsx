@@ -486,7 +486,12 @@ export function AiChat({
                       <MessageScrollerItem
                         key={message.id}
                         messageId={message.id}
-                        scrollAnchor={message.role === "user"}
+                        scrollAnchor={
+                          message.role === "user" &&
+                          message.id ===
+                            messages.findLast((item) => item.role === "user")
+                              ?.id
+                        }
                       >
                         <Message
                           align={message.role === "user" ? "end" : "start"}
@@ -530,16 +535,26 @@ export function AiChat({
                     ))}
 
                     {status === "submitted" ? (
-                      <AssistantPendingSkeleton />
+                      <MessageScrollerItem
+                        messageId="pending"
+                        className="[content-visibility:visible]"
+                      >
+                        <AssistantPendingSkeleton />
+                      </MessageScrollerItem>
                     ) : null}
 
                     {error ? (
-                      <Marker>
-                        <MarkerContent>
-                          {error.message ||
-                            "Something went wrong with the AI request."}
-                        </MarkerContent>
-                      </Marker>
+                      <MessageScrollerItem
+                        messageId="error"
+                        className="[content-visibility:visible]"
+                      >
+                        <Marker>
+                          <MarkerContent>
+                            {error.message ||
+                              "Something went wrong with the AI request."}
+                          </MarkerContent>
+                        </Marker>
+                      </MessageScrollerItem>
                     ) : null}
                   </MessageScrollerContent>
                 </MessageScrollerViewport>
@@ -584,7 +599,7 @@ export function AiChat({
                 onChange={(event) => setInput(event.target.value)}
                 placeholder="How can I help you today?"
                 rows={2}
-                className="min-h-20 border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                className="min-h-20 max-h-40 overflow-y-auto border-0 bg-transparent px-4 pt-4 pb-2 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
                 onPaste={(event) => {
                   const items = event.clipboardData?.files;
                   if (items?.length) {
@@ -881,7 +896,7 @@ function MessagePartView({
     if (!part.text) return null;
     const align = role === "user" ? "end" : "start";
     return (
-      <Bubble variant={role === "user" ? "default" : "muted"} align={align}>
+      <Bubble variant={role === "user" ? "default" : "ghost"} align={align}>
         <BubbleContent>
           <MarkdownMessage isAnimating={isStreaming && role === "assistant"}>
             {part.text}
@@ -896,6 +911,11 @@ function MessagePartView({
   }
 
   if (isReasoningUIPart(part)) {
+    if (isStreaming) {
+      return (
+        <p className="px-1 text-xs text-muted-foreground shimmer">Thinking…</p>
+      );
+    }
     if (!part.text) return null;
     return (
       <Collapsible className="w-full max-w-lg">
