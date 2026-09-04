@@ -1,40 +1,106 @@
-import type { Db } from "mongodb";
+import type {
+  Collection,
+  CreateIndexesOptions,
+  Db,
+  IndexSpecification,
+} from "mongodb";
 import { COLLECTIONS } from "@/lib/db/mongodb";
 
+/** Mongo auto-name for a key pattern, e.g. { a: 1, b: -1 } → "a_1_b_-1". */
+function defaultIndexName(key: IndexSpecification): string {
+  return Object.entries(key)
+    .map(([field, direction]) => `${field}_${direction}`)
+    .join("_");
+}
+
 /**
- * Recommended Better Auth & App indexes for MongoDB.
- * Idempotent — safe to run on every cold start.
+ * createIndex, dropping a same-name/same-key index first when options diverge.
+ * Handles MongoDB codes 85 (IndexOptionsConflict) and 86 (IndexKeySpecsConflict).
+ */
+async function ensureIndex(
+  collection: Collection,
+  key: IndexSpecification,
+  options: CreateIndexesOptions = {},
+) {
+  try {
+    await collection.createIndex(key, options);
+  } catch (error) {
+    const code = (error as { code?: number }).code;
+    if (code !== 85 && code !== 86) throw error;
+
+    const name =
+      (typeof options.name === "string" && options.name) ||
+      defaultIndexName(key);
+    await collection.dropIndex(name);
+    await collection.createIndex(key, options);
+  }
+}
+
+let indexesPromise: Promise<void> | null = null;
+
+/**
+ * Recommended Better Auth & app indexes for MongoDB.
+ * Memoized — safe to call from instrumentation and route handlers.
  * @see https://better-auth.com/docs/guides/optimizing-for-performance#recommended-fields-to-index
  */
 export async function ensureAuthIndexes(db: Db) {
-  await Promise.all([
-    // Core
-    db.collection(COLLECTIONS.USER).createIndex({ email: 1 }, { unique: true }),
-    db.collection(COLLECTIONS.ACCOUNT).createIndex({ userId: 1 }),
-    db.collection(COLLECTIONS.SESSION).createIndex({ userId: 1 }),
-    db.collection(COLLECTIONS.SESSION).createIndex({ token: 1 }, { unique: true }),
-    db.collection(COLLECTIONS.VERIFICATION).createIndex({ identifier: 1 }),
+  indexesPromise ??= createAuthIndexes(db).catch((error) => {
+    indexesPromise = null;
+    throw error;
+  });
+  return indexesPromise;
+}
 
-    // Database-backed rate limiting (rateLimit.storage: "database")
-    db.collection(COLLECTIONS.RATE_LIMIT).createIndex({ key: 1 }, { unique: true }),
+async function createAuthIndexes(db: Db) {
+  const tasks = [
+    ensureIndex(
+      db.collection(COLLECTIONS.USER),
+      { email: 1 },
+      { unique: true },
+    ),
+    ensureIndex(db.collection(COLLECTIONS.ACCOUNT), { userId: 1 }),
+    ensureIndex(db.collection(COLLECTIONS.SESSION), { userId: 1 }),
+    ensureIndex(
+      db.collection(COLLECTIONS.SESSION),
+      { token: 1 },
+      { unique: true },
+    ),
+    ensureIndex(db.collection(COLLECTIONS.VERIFICATION), { identifier: 1 }),
+    ensureIndex(
+      db.collection(COLLECTIONS.RATE_LIMIT),
+      { key: 1 },
+      { unique: true },
+    ),
+    ensureIndex(
+      db.collection(COLLECTIONS.ORGANIZATION),
+      { slug: 1 },
+      { unique: true },
+    ),
+    ensureIndex(db.collection(COLLECTIONS.MEMBER), { userId: 1 }),
+    ensureIndex(db.collection(COLLECTIONS.MEMBER), { organizationId: 1 }),
+    ensureIndex(
+      db.collection(COLLECTIONS.MEMBER),
+      { organizationId: 1, userId: 1 },
+      { unique: true },
+    ),
+    ensureIndex(db.collection(COLLECTIONS.INVITATION), { email: 1 }),
+    ensureIndex(db.collection(COLLECTIONS.INVITATION), { organizationId: 1 }),
+    ensureIndex(db.collection(COLLECTIONS.CHAT_CONVERSATIONS), {
+      organizationId: 1,
+      updatedAt: -1,
+    }),
+    ensureIndex(
+      db.collection(COLLECTIONS.CHAT_CONVERSATIONS),
+      { id: 1, organizationId: 1 },
+      { unique: true },
+    ),
+  ];
 
-    // Organization plugin
-    db.collection(COLLECTIONS.ORGANIZATION).createIndex({ slug: 1 }, { unique: true }),
-    db.collection(COLLECTIONS.MEMBER).createIndex({ userId: 1 }),
-    db.collection(COLLECTIONS.MEMBER).createIndex({ organizationId: 1 }),
-    db
-      .collection(COLLECTIONS.MEMBER)
-      .createIndex({ organizationId: 1, userId: 1 }, { unique: true }),
-    // Organization plugin schema includes invitation even if unused
-    db.collection(COLLECTIONS.INVITATION).createIndex({ email: 1 }),
-    db.collection(COLLECTIONS.INVITATION).createIndex({ organizationId: 1 }),
-
-    // Chat Conversations (organization-scoped)
-    db
-      .collection(COLLECTIONS.CHAT_CONVERSATIONS)
-      .createIndex({ organizationId: 1, updatedAt: -1 }),
-    db
-      .collection(COLLECTIONS.CHAT_CONVERSATIONS)
-      .createIndex({ id: 1, organizationId: 1 }, { unique: true }),
-  ]);
+  await Promise.all(
+    tasks.map((task) =>
+      task.catch((error) => {
+        console.warn("[mongodb] Index creation failed:", error);
+      }),
+    ),
+  );
 }

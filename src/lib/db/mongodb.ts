@@ -1,6 +1,7 @@
+import "server-only";
+
 import { attachDatabasePool } from "@vercel/functions";
-import { MongoClient, type MongoClientOptions } from "mongodb";
-import { after } from "next/server";
+import { MongoClient, type MongoClientOptions, ObjectId } from "mongodb";
 import { ensureAuthIndexes } from "@/lib/auth/indexes";
 
 const uri = process.env.MONGODB_URI;
@@ -15,6 +16,9 @@ if (!uri) {
  */
 const options: MongoClientOptions = {
   appName: "starter-kit",
+  maxIdleTimeMS: 60_000,
+  maxPoolSize: 10,
+  minPoolSize: 0,
   serverSelectionTimeoutMS: 15_000,
   socketTimeoutMS: 45_000,
 };
@@ -47,8 +51,29 @@ export const COLLECTIONS = {
   INVITATION: "invitation",
 } as const;
 
+export const DB_NAME = dbName;
+
 /** Shared DB handle — Better Auth and App collections live here */
 export const db = client.db(dbName);
+
+/** 24-char hex Mongo id. */
+export function isId(id: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(id);
+}
+
+/**
+ * Match an id whether Mongo stored it as ObjectId or hex string.
+ * Use in filters: `{ userId: matchId(userId) }`
+ */
+export function matchId(id: string) {
+  if (!isId(id)) return id;
+  return { $in: [new ObjectId(id), id] as const };
+}
+
+/** Expand ids for `$in` queries. */
+export function matchIds(ids: string[]) {
+  return ids.flatMap((id) => (isId(id) ? [new ObjectId(id), id] : [id]));
+}
 
 let connectPromise: Promise<void> | null = null;
 let indexesScheduled = false;
@@ -76,21 +101,16 @@ function scheduleAuthIndexes() {
   if (indexesScheduled) return;
   indexesScheduled = true;
 
-  // Non-blocking index setup — do not compete with first auth/DB request.
-  // Next.js 16+: prefer after() over waitUntil for post-response work.
-  after(async () => {
-    try {
-      await ensureAuthIndexes(db);
-    } catch (error) {
-      indexesScheduled = false;
-      console.error("[mongodb] Failed to ensure auth indexes:", error);
-    }
+  // Fire-and-forget — do not use after() (requires a request scope).
+  void ensureAuthIndexes(db).catch((error) => {
+    indexesScheduled = false;
+    console.error("[mongodb] Failed to ensure auth indexes:", error);
   });
 }
 
 /**
  * Ensure MongoDB is connected before auth or DB operations.
- * Index creation runs after the response via after() so login is not blocked.
+ * Index creation runs in the background so login is not blocked.
  * @see https://www.better-auth.com/docs/guides/optimizing-for-performance
  */
 export function ensureDbReady(): Promise<void> {

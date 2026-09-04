@@ -3,7 +3,10 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins/organization";
 import { waitUntil } from "@vercel/functions";
+import { getTrustedOrigins } from "@/lib/env";
 import client, { db } from "@/lib/db/mongodb";
+
+const isProduction = process.env.NODE_ENV === "production";
 
 /**
  * Better Auth (MongoDB) + organization plugin.
@@ -12,6 +15,8 @@ import client, { db } from "@/lib/db/mongodb";
  * @see https://www.better-auth.com/docs/integrations/next
  */
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL,
+  trustedOrigins: getTrustedOrigins(),
   database: mongodbAdapter(db, { client }),
   socialProviders: {
     google: {
@@ -34,6 +39,7 @@ export const auth = betterAuth({
     storage: "database",
   },
   advanced: {
+    useSecureCookies: isProduction,
     database: {
       joins: true,
     },

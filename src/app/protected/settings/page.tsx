@@ -1,6 +1,5 @@
 "use client";
 
-import type { PaginationState, SortingState } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
@@ -25,13 +24,10 @@ import {
 import {
   createDataTableColumnHelper,
   DataTable,
-  DataTableColumnHeader,
+  dataTableActionColumnMeta,
+  sortableColumnHeader,
 } from "@/components/ui/data-table";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -41,129 +37,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
-import { authClient, hardResetForOrganization, useSession } from "@/lib/auth/client";
+import {
+  authClient,
+  hardResetForOrganization,
+  useSession,
+} from "@/lib/auth/client";
 import {
   canDeleteOrganization,
   canManageMembers,
   hasOwnerRole,
 } from "@/lib/auth/permissions";
-import type {
-  InvitationRow,
-  MemberRow,
-  MemberTableMeta,
-  OrganizationRole,
-} from "@/lib/types";
+import type { InvitationRow, MemberRow, OrganizationRole } from "@/lib/types";
 
 const columnHelper = createDataTableColumnHelper<MemberRow>();
-
-const memberColumns = columnHelper.columns([
-  columnHelper.accessor("name", {
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Name" />
-    ),
-    cell: ({ row, table }) => {
-      const meta = table.options.meta as MemberTableMeta | undefined;
-      const isSelf = row.original.userId === meta?.currentUserId;
-      return (
-        <span className="font-medium">
-          {row.original.name || "—"}
-          {isSelf ? (
-            <span className="ms-2 text-xs text-muted-foreground">(you)</span>
-          ) : null}
-        </span>
-      );
-    },
-    sortFn: "text",
-  }),
-  columnHelper.accessor("email", {
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Email" />
-    ),
-    cell: ({ getValue }) => getValue() || "—",
-    sortFn: "text",
-  }),
-  columnHelper.accessor("role", {
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Role" />
-    ),
-    cell: ({ getValue }) => <Badge variant="secondary">{getValue()}</Badge>,
-    sortFn: "text",
-  }),
-  columnHelper.display({
-    id: "actions",
-    header: () => <div className="text-end">Actions</div>,
-    cell: ({ row, table }) => {
-      const meta = table.options.meta as MemberTableMeta | undefined;
-      if (!meta?.canManage) return null;
-
-      const member = row.original;
-      const isSelf = member.userId === meta.currentUserId;
-      const busy = meta.busyId === member.id;
-
-      return (
-        <div className="flex justify-end gap-2">
-          {member.role !== "owner" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => meta.onMakeOwner(member)}
-            >
-              {busy ? <Spinner data-icon="inline-start" /> : null}
-              Make owner
-            </Button>
-          ) : null}
-          {!isSelf ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={busy}
-              onClick={() => meta.onRemove(member)}
-            >
-              {busy ? <Spinner data-icon="inline-start" /> : null}
-              Remove
-            </Button>
-          ) : null}
-        </div>
-      );
-    },
-  }),
-]);
-
-function useDebouncedValue<T>(value: T, delayMs: number) {
-  const [debounced, setDebounced] = React.useState(value);
-  React.useEffect(() => {
-    const id = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(id);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [searchInput, setSearchInput] = React.useState("");
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-  const [pagination, setPagination] = React.useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 10,
-  });
-  const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "name", desc: false },
-  ]);
   const [members, setMembers] = React.useState<MemberRow[]>([]);
   const [invitations, setInvitations] = React.useState<InvitationRow[]>([]);
   const [organizationId, setOrganizationId] = React.useState<string | null>(
     null,
   );
-  const [organizationName, setOrganizationName] = React.useState("Organization");
+  const [organizationName, setOrganizationName] =
+    React.useState("Organization");
   const [currentRole, setCurrentRole] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [email, setEmail] = React.useState("");
-  const [inviteRole, setInviteRole] = React.useState<OrganizationRole>("member");
+  const [inviteRole, setInviteRole] =
+    React.useState<OrganizationRole>("member");
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
@@ -222,47 +126,12 @@ export default function SettingsPage() {
     void loadMembers();
   }, [loadMembers]);
 
-  React.useEffect(() => {
-    setPagination((prev) =>
-      prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 },
-    );
-  }, [debouncedSearch, sorting]);
-
   const canManage = canManageMembers(currentRole);
   const canDelete = canDeleteOrganization(currentRole);
   const ownerCount = members.filter((member) =>
     hasOwnerRole(member.role),
   ).length;
   const isSoleOwner = hasOwnerRole(currentRole) && ownerCount <= 1;
-
-  const filtered = React.useMemo(() => {
-    const search = debouncedSearch.trim().toLowerCase();
-    let rows = members;
-    if (search) {
-      rows = rows.filter(
-        (row) =>
-          row.name.toLowerCase().includes(search) ||
-          row.email.toLowerCase().includes(search) ||
-          row.role.toLowerCase().includes(search),
-      );
-    }
-
-    const sort = sorting[0];
-    const key = (sort?.id ?? "name") as keyof MemberRow;
-    const dir = sort?.desc ? -1 : 1;
-    return [...rows].sort((a, b) => {
-      const left = String(a[key] ?? "").toLowerCase();
-      const right = String(b[key] ?? "").toLowerCase();
-      if (left < right) return -1 * dir;
-      if (left > right) return 1 * dir;
-      return 0;
-    });
-  }, [members, debouncedSearch, sorting]);
-
-  const pageRows = filtered.slice(
-    pagination.pageIndex * pagination.pageSize,
-    pagination.pageIndex * pagination.pageSize + pagination.pageSize,
-  );
 
   async function inviteMember(event: React.FormEvent) {
     event.preventDefault();
@@ -308,38 +177,50 @@ export default function SettingsPage() {
     await loadMembers();
   }
 
-  async function removeMember(member: MemberRow) {
-    if (!canManage) return;
-    setBusyId(member.id);
-    const { error } = await authClient.organization.removeMember({
-      memberIdOrEmail: member.id,
-    });
-    setBusyId(null);
-    if (error) {
-      toast.add({ title: "Could not remove member", description: error.message });
-      return;
-    }
-    toast.add({ title: "Member removed" });
-    await loadMembers();
-    router.refresh();
-  }
+  const removeMember = React.useCallback(
+    async (member: MemberRow) => {
+      if (!canManage) return;
+      setBusyId(member.id);
+      const { error } = await authClient.organization.removeMember({
+        memberIdOrEmail: member.id,
+      });
+      setBusyId(null);
+      if (error) {
+        toast.add({
+          title: "Could not remove member",
+          description: error.message,
+        });
+        return;
+      }
+      toast.add({ title: "Member removed" });
+      await loadMembers();
+      router.refresh();
+    },
+    [canManage, loadMembers, router],
+  );
 
-  async function makeOwner(member: MemberRow) {
-    if (!canManage) return;
-    setBusyId(member.id);
-    const { error } = await authClient.organization.updateMemberRole({
-      memberId: member.id,
-      role: "owner",
-    });
-    setBusyId(null);
-    if (error) {
-      toast.add({ title: "Could not update role", description: error.message });
-      return;
-    }
-    toast.add({ title: "Member is now an owner" });
-    await loadMembers();
-    router.refresh();
-  }
+  const makeOwner = React.useCallback(
+    async (member: MemberRow) => {
+      if (!canManage) return;
+      setBusyId(member.id);
+      const { error } = await authClient.organization.updateMemberRole({
+        memberId: member.id,
+        role: "owner",
+      });
+      setBusyId(null);
+      if (error) {
+        toast.add({
+          title: "Could not update role",
+          description: error.message,
+        });
+        return;
+      }
+      toast.add({ title: "Member is now an owner" });
+      await loadMembers();
+      router.refresh();
+    },
+    [canManage, loadMembers, router],
+  );
 
   async function leaveOrganization() {
     if (!organizationId || isSoleOwner) return;
@@ -367,6 +248,90 @@ export default function SettingsPage() {
     toast.add({ title: "Organization deleted" });
     hardResetForOrganization("/protected/dashboard");
   }
+
+  const memberColumns = React.useMemo(
+    () =>
+      columnHelper.columns([
+        columnHelper.accessor((row) => `${row.name} ${row.email} ${row.role}`, {
+          id: "name",
+          header: sortableColumnHeader("Name"),
+          cell: ({ row }) => {
+            const isSelf = row.original.userId === session?.user.id;
+            return (
+              <span className="font-medium">
+                {row.original.name || "—"}
+                {isSelf ? (
+                  <span className="ms-2 text-xs text-muted-foreground">
+                    (you)
+                  </span>
+                ) : null}
+              </span>
+            );
+          },
+          sortFn: "text",
+        }),
+        columnHelper.accessor("email", {
+          header: sortableColumnHeader("Email"),
+          cell: ({ getValue }) => getValue() || "—",
+          sortFn: "text",
+        }),
+        columnHelper.accessor("role", {
+          header: sortableColumnHeader("Role"),
+          cell: ({ getValue }) => (
+            <Badge variant="secondary">{String(getValue())}</Badge>
+          ),
+          sortFn: "text",
+        }),
+        columnHelper.display({
+          id: "actions",
+          enableSorting: false,
+          enableHiding: false,
+          header: () => <div className="text-end">Actions</div>,
+          meta: dataTableActionColumnMeta.wide,
+          cell: ({ row }) => {
+            if (!canManage) return null;
+
+            const member = row.original;
+            const isSelf = member.userId === session?.user.id;
+            const busy = busyId === member.id;
+
+            return (
+              <div className="flex justify-end gap-2">
+                {member.role !== "owner" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void makeOwner(member);
+                    }}
+                  >
+                    {busy ? <Spinner data-icon="inline-start" /> : null}
+                    Make owner
+                  </Button>
+                ) : null}
+                {!isSelf ? (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void removeMember(member);
+                    }}
+                  >
+                    {busy ? <Spinner data-icon="inline-start" /> : null}
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+            );
+          },
+        }),
+      ]),
+    [busyId, canManage, makeOwner, removeMember, session?.user.id],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 p-4">
@@ -406,7 +371,11 @@ export default function SettingsPage() {
                   <Select
                     value={inviteRole}
                     onValueChange={(value) => {
-                      if (value === "member" || value === "admin" || value === "owner") {
+                      if (
+                        value === "member" ||
+                        value === "admin" ||
+                        value === "owner"
+                      ) {
                         setInviteRole(value);
                       }
                     }}
@@ -476,45 +445,19 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Members</CardTitle>
-          <CardDescription>Search, sort, and page through members.</CardDescription>
+          <CardDescription>
+            Search, sort, and page through members.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Field>
-            <FieldLabel htmlFor="member-search">Search</FieldLabel>
-            <Input
-              id="member-search"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Name, email, or role…"
-            />
-          </Field>
-
-          {loading && members.length === 0 ? (
-            <MembersTableSkeleton />
-          ) : (
-            <div className={loading ? "opacity-60" : undefined}>
-              <DataTable
-                columns={memberColumns}
-                data={pageRows}
-                rowCount={filtered.length}
-                pagination={pagination}
-                onPaginationChange={setPagination}
-                sorting={sorting}
-                onSortingChange={setSorting}
-                manualPagination
-                manualSorting
-                manualFiltering
-                emptyMessage="No members found."
-                meta={{
-                  currentUserId: session?.user.id,
-                  canManage,
-                  busyId,
-                  onMakeOwner: (member: MemberRow) => void makeOwner(member),
-                  onRemove: (member: MemberRow) => void removeMember(member),
-                }}
-              />
-            </div>
-          )}
+        <CardContent>
+          <DataTable
+            columns={memberColumns}
+            data={members}
+            loading={loading}
+            searchKey="name"
+            searchPlaceholder="Name, email, or role…"
+            hideColumns
+          />
         </CardContent>
       </Card>
 
@@ -533,9 +476,7 @@ export default function SettingsPage() {
               disabled={!organizationId || busyId === "leave"}
               onClick={() => void leaveOrganization()}
             >
-              {busyId === "leave" ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
+              {busyId === "leave" ? <Spinner data-icon="inline-start" /> : null}
               Leave organization
             </Button>
           ) : (
@@ -562,8 +503,8 @@ export default function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete organization?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes &quot;{organizationName}&quot; and removes
-              all members. This cannot be undone.
+              This permanently deletes &quot;{organizationName}&quot; and
+              removes all members. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -586,30 +527,6 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
-  );
-}
-
-function MembersTableSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-md border">
-      <div className="flex gap-4 border-b px-4 py-3">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="ms-auto h-4 w-20" />
-      </div>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div
-          key={index}
-          className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
-        >
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-4 w-44" />
-          <Skeleton className="h-5 w-16 rounded-full" />
-          <Skeleton className="ms-auto h-7 w-24" />
-        </div>
-      ))}
     </div>
   );
 }

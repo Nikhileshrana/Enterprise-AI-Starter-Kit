@@ -34,7 +34,7 @@ Landing page with Google sign-in and a full module overview — everything inclu
 |--------|---------|
 | **Better Auth** | Cookie-based sessions, MongoDB adapter |
 | **Google OAuth** | Social sign-in |
-| **Protected routes** | Optimistic middleware gate + server session validation |
+| **Protected routes** | Optimistic proxy gate (`proxy.ts`) + server session validation |
 | **Rate limiting** | Database-backed request limits |
 
 ### Multi-tenancy
@@ -159,7 +159,8 @@ AI_GATEWAY_API_KEY=             # or VERCEL_OIDC_TOKEN via `vercel env pull`
 AI_GATEWAY_MODEL=openai/gpt-5.4 # optional default model
 
 # Optional
-TOOL_APPROVAL_SECRET=           # defaults to BETTER_AUTH_SECRET
+BETTER_AUTH_TRUSTED_ORIGINS=   # comma-separated extra origins (preview URLs)
+TOOL_APPROVAL_SECRET=          # defaults to BETTER_AUTH_SECRET
 ```
 
 ### Install & run
@@ -187,7 +188,7 @@ This project follows the documented patterns for **Better Auth + MongoDB + Verce
 | Adapter | `mongodbAdapter(db, { client })` with shared `MongoClient` ([docs](https://www.better-auth.com/docs/adapters/mongo)) |
 | Connection pooling | `attachDatabasePool(client)` ([Vercel docs](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#attachdatabasepool)) |
 | Cold starts | `ensureDbReady()` connects with retry before auth/DB routes run |
-| Indexes | Idempotent `createIndex` in background via `after()` ([performance guide](https://www.better-auth.com/docs/guides/optimizing-for-performance)) |
+| Indexes | Memoized `createIndex` on startup (`instrumentation.ts`) + lazy fallback in `ensureDbReady()` |
 | Joins | `advanced.database.joins: true` for faster session/org queries |
 | Rate limits | `rateLimit.storage: "database"` (not in-memory) for serverless |
 | Protected routes | Cookie check in `proxy.ts`, full `getSession` in layout ([Next.js integration](https://www.better-auth.com/docs/integrations/next)) |
